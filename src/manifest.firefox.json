@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Alan Review Tool",
+  "version": "0.1.0",
+  "description": "Slide-out review overlay for capturing website feedback on any site.",
+  "action": {
+    "default_title": "Toggle Alan Review Tool"
+  },
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "permissions": ["activeTab", "scripting"],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "alan-review-tool@borderux.com"
+    }
+  }
+}
