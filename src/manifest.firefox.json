@@ -9,7 +9,7 @@
   "background": {
     "scripts": ["background.js"]
   },
-  "permissions": ["activeTab", "scripting"],
+  "permissions": ["activeTab", "scripting", "storage"],
   "browser_specific_settings": {
     "gecko": {
       "id": "alan-review-tool@borderux.com"

@@ -1,7 +1,12 @@
-(function () {
+(async function () {
   const HOST_ID = "alan-review-tool-host";
-  const PANEL_WIDTH = 320;
+  const WIDTH_STORAGE_KEY = "alanReviewToolPanelWidth";
+  const DEFAULT_WIDTH = 320;
+  const MIN_WIDTH = 240;
+  const MAX_WIDTH = 720;
   const html = document.documentElement;
+
+  const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
   function restorePage() {
     html.style.width = html.dataset.alanReviewToolPrevWidth || "";
@@ -19,10 +24,13 @@
     return;
   }
 
+  const stored = await chrome.storage.local.get(WIDTH_STORAGE_KEY);
+  let panelWidth = clamp(stored[WIDTH_STORAGE_KEY] ?? DEFAULT_WIDTH, MIN_WIDTH, MAX_WIDTH);
+
   html.dataset.alanReviewToolPrevWidth = html.style.width;
   html.dataset.alanReviewToolPrevTransition = html.style.transition;
   html.style.transition = "width 0.2s ease-out";
-  html.style.width = `calc(100% - ${PANEL_WIDTH}px)`;
+  html.style.width = `calc(100% - ${panelWidth}px)`;
 
   const host = document.createElement("div");
   host.id = HOST_ID;
@@ -30,7 +38,7 @@
   host.style.position = "fixed";
   host.style.top = "0";
   host.style.right = "0";
-  host.style.width = `${PANEL_WIDTH}px`;
+  host.style.width = `${panelWidth}px`;
   host.style.height = "100vh";
   host.style.zIndex = "2147483647";
   document.documentElement.appendChild(host);
@@ -40,6 +48,19 @@
 
   shadow.innerHTML = `
     <style>
+      :host { display: block; }
+      .resizer {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 6px;
+        height: 100%;
+        cursor: ew-resize;
+        background: transparent;
+      }
+      .resizer:hover, .resizer.dragging {
+        background: rgba(255, 255, 255, 0.25);
+      }
       .panel {
         font-family: system-ui, sans-serif;
         width: 100%;
@@ -58,6 +79,7 @@
         cursor: pointer;
       }
     </style>
+    <div class="resizer"></div>
     <div class="panel">
       <h2>Alan Review Tool</h2>
       <p>Injected on: ${location.hostname}</p>
@@ -68,5 +90,34 @@
   shadow.getElementById("close").addEventListener("click", () => {
     host.remove();
     restorePage();
+  });
+
+  // Dragging the strip resizes the panel and the page's reflowed width together,
+  // then persists the final width so the next injection (a fresh script
+  // execution with no memory of this one) opens at the same size.
+  const resizer = shadow.querySelector(".resizer");
+  resizer.addEventListener("mousedown", (mouseDownEvent) => {
+    mouseDownEvent.preventDefault();
+    const startX = mouseDownEvent.clientX;
+    const startWidth = panelWidth;
+    resizer.classList.add("dragging");
+    html.style.transition = "";
+
+    function onMouseMove(moveEvent) {
+      const delta = startX - moveEvent.clientX;
+      panelWidth = clamp(startWidth + delta, MIN_WIDTH, MAX_WIDTH);
+      host.style.width = `${panelWidth}px`;
+      html.style.width = `calc(100% - ${panelWidth}px)`;
+    }
+
+    function onMouseUp() {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      resizer.classList.remove("dragging");
+      chrome.storage.local.set({ [WIDTH_STORAGE_KEY]: panelWidth });
+    }
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
   });
 })();
