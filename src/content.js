@@ -1,10 +1,28 @@
 (function () {
   const HOST_ID = "alan-review-tool-host";
+  const PANEL_WIDTH = 320;
+  const html = document.documentElement;
+
+  function restorePage() {
+    html.style.width = html.dataset.alanReviewToolPrevWidth || "";
+    html.style.transition = html.dataset.alanReviewToolPrevTransition || "";
+    delete html.dataset.alanReviewToolPrevWidth;
+    delete html.dataset.alanReviewToolPrevTransition;
+  }
+
   const existing = document.getElementById(HOST_ID);
   if (existing) {
+    // A fresh injection per click means no JS state survives between clicks -
+    // the "previous style" has to live on the DOM itself (dataset), not a closure.
     existing.remove();
+    restorePage();
     return;
   }
+
+  html.dataset.alanReviewToolPrevWidth = html.style.width;
+  html.dataset.alanReviewToolPrevTransition = html.style.transition;
+  html.style.transition = "width 0.2s ease-out";
+  html.style.width = `calc(100% - ${PANEL_WIDTH}px)`;
 
   const host = document.createElement("div");
   host.id = HOST_ID;
@@ -12,6 +30,8 @@
   host.style.position = "fixed";
   host.style.top = "0";
   host.style.right = "0";
+  host.style.width = `${PANEL_WIDTH}px`;
+  host.style.height = "100vh";
   host.style.zIndex = "2147483647";
   document.documentElement.appendChild(host);
 
@@ -22,8 +42,8 @@
     <style>
       .panel {
         font-family: system-ui, sans-serif;
-        width: 280px;
-        height: 100vh;
+        width: 100%;
+        height: 100%;
         background: #1e1e2e;
         color: #fff;
         box-shadow: -4px 0 12px rgba(0, 0, 0, 0.3);
@@ -45,5 +65,8 @@
       <button id="close">Close</button>
     </div>
   `;
-  shadow.getElementById("close").addEventListener("click", () => host.remove());
+  shadow.getElementById("close").addEventListener("click", () => {
+    host.remove();
+    restorePage();
+  });
 })();
