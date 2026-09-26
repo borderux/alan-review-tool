@@ -195,7 +195,6 @@
     clearBtn.textContent = "Clear Annotations";
     for (const btn of [deleteBtn, clearBtn]) {
       btn.style.padding = "6px 12px";
-      btn.style.cursor = "pointer";
       btn.style.border = "1px solid rgba(255, 255, 255, 0.3)";
       btn.style.borderRadius = "4px";
       btn.style.background = "#1e1e2e";
@@ -204,6 +203,19 @@
     }
     buttonRow.appendChild(deleteBtn);
     buttonRow.appendChild(clearBtn);
+
+    // These buttons live in the light DOM (the overlay is appended to
+    // document.documentElement, not the shadow root), so content.css's
+    // button:disabled rule never reaches them - the disabled look has to
+    // be set by hand instead of relying on the shared stylesheet.
+    let hasAnnotation = false;
+    function updateClearBtnState() {
+      clearBtn.disabled = !hasAnnotation;
+      clearBtn.style.opacity = hasAnnotation ? "1" : "0.5";
+      clearBtn.style.cursor = hasAnnotation ? "pointer" : "default";
+    }
+    deleteBtn.style.cursor = "pointer";
+    updateClearBtnState();
 
     overlay.appendChild(imageWrap);
     overlay.appendChild(buttonRow);
@@ -245,6 +257,10 @@
       ctx.stroke();
       lastX = p.x;
       lastY = p.y;
+      if (!hasAnnotation) {
+        hasAnnotation = true;
+        updateClearBtnState();
+      }
     });
     function stopDrawing() {
       drawing = false;
@@ -254,6 +270,8 @@
 
     clearBtn.addEventListener("click", () => {
       ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+      hasAnnotation = false;
+      updateClearBtnState();
     });
 
     function close() {
