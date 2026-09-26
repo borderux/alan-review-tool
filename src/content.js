@@ -53,6 +53,7 @@
   let comments = [];
   let composerOpen = false;
   let pendingScreenshot = null;
+  let captureError = null;
 
   function escapeHtml(str) {
     const div = document.createElement("div");
@@ -65,6 +66,7 @@
       <div class="composer">
         <textarea id="comment-text" placeholder="What's the feedback?"></textarea>
         ${pendingScreenshot ? `<img class="thumb" src="${pendingScreenshot}" alt="Captured region" />` : ""}
+        ${captureError ? `<p class="capture-error">Couldn't capture a screenshot: ${escapeHtml(captureError)}</p>` : ""}
         <div class="composer-actions">
           <button id="capture-btn" type="button">Capture screenshot</button>
           <button id="save-btn" type="button">Add comment</button>
@@ -146,6 +148,10 @@
           border-radius: 4px;
           border: 1px solid rgba(255, 255, 255, 0.2);
         }
+        .capture-error {
+          color: #ff8080;
+          opacity: 1;
+        }
         .comments {
           margin-top: 16px;
           display: flex;
@@ -187,12 +193,14 @@
     shadow.getElementById("new-comment")?.addEventListener("click", () => {
       composerOpen = true;
       pendingScreenshot = null;
+      captureError = null;
       render();
     });
 
     shadow.getElementById("cancel-btn")?.addEventListener("click", () => {
       composerOpen = false;
       pendingScreenshot = null;
+      captureError = null;
       render();
     });
 
@@ -207,9 +215,20 @@
 
     shadow.getElementById("capture-btn")?.addEventListener("click", async () => {
       const draftText = shadow.getElementById("comment-text")?.value ?? "";
-      const rect = await selectRegion();
-      if (rect) {
-        pendingScreenshot = await captureAndCrop(rect);
+      captureError = null;
+      try {
+        const rect = await selectRegion();
+        if (rect) {
+          const result = await captureAndCrop(rect);
+          if (result.error) captureError = result.error;
+          else pendingScreenshot = result.dataUrl;
+        }
+      } catch (err) {
+        // Whatever broke, the composer must still re-render with the
+        // reason visible - a swallowed exception here is indistinguishable
+        // from the button doing nothing at all.
+        console.error("Alan Review Tool: screenshot capture failed.", err);
+        captureError = String(err);
       }
       render();
       const textEl = shadow.getElementById("comment-text");
@@ -349,11 +368,13 @@
     // panel from the previous frame can end up in the captured pixels.
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-    const fullDataUrl = await chrome.runtime.sendMessage({ type: "alan-review-tool:capture" });
-    if (!fullDataUrl) return null;
+    const response = await chrome.runtime.sendMessage({ type: "alan-review-tool:capture" });
+    if (!response?.dataUrl) {
+      return { error: response?.error || "the background worker returned nothing" };
+    }
 
     const dpr = window.devicePixelRatio || 1;
-    const img = await loadImage(fullDataUrl);
+    const img = await loadImage(response.dataUrl);
     const canvas = document.createElement("canvas");
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
@@ -369,7 +390,7 @@
       rect.width * dpr,
       rect.height * dpr,
     );
-    return canvas.toDataURL("image/png");
+    return { dataUrl: canvas.toDataURL("image/png") };
   }
 
   render();
