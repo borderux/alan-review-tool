@@ -77,16 +77,16 @@ button:disabled {
 /* Every comment - newest or not - shares one card: a lighter-grey border
    so it's visible against the panel's own subtle background tint, the
    same upper-right delete X, and a 50x50 lower-right slot for the
-   thumbnail or camera button. padding-bottom reserves an empty strip
-   below the text content (which only occupies the box's normal content
-   area, above that reserved padding) for that slot, so it never overlaps
-   the text itself. */
+   thumbnail or camera button. The text can't share the button's column
+   (reserved via padding-right on .comment-text, its full height) but can
+   run the full height of the card everywhere else - it isn't confined to
+   "above the button," it's just narrower in that one column. */
 .comment-item {
   position: relative;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 4px;
-  padding: 8px 8px 60px;
+  padding: 8px;
 }
 /* The only focus indicator, per feedback: no separate hover/focus
    background highlight on the text itself, just a lighter card border. */
@@ -154,8 +154,13 @@ button:disabled {
   font-size: 13px;
   opacity: 1;
   white-space: pre-wrap;
-  min-height: 1.4em;
+  /* Roughly the thumb/camera's own height plus breathing room, so a
+     short or empty comment's card doesn't leave a visible gap above the
+     corner slot - the edit area reaches down near the bottom by default,
+     not just whenever there happens to be enough text to get there. */
+  min-height: 62px;
   padding: 2px;
+  padding-right: 58px;
   border-radius: 3px;
 }
 .comment-text:focus {
