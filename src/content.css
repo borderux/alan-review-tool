@@ -46,6 +46,16 @@
      visibly off-center against the taller logo next to it. */
   margin: 0;
 }
+.panel-title .version {
+  font-size: 11px;
+  opacity: 0.5;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
 h2 {
   margin: 0 0 8px;
   font-size: 16px;
@@ -78,7 +88,7 @@ button:disabled {
   background: #999;
   color: #1e1e2e;
 }
-#close.round-btn {
+.header-actions .round-btn {
   width: 26px;
   height: 26px;
   font-size: 16px;
@@ -244,4 +254,25 @@ button:disabled {
 }
 .comment-text:focus {
   outline: none;
+}
+
+.help h3 {
+  margin: 8px 0 4px;
+  font-size: 15px;
+}
+.help h4 {
+  margin: 14px 0 2px;
+  font-size: 13px;
+  opacity: 0.9;
+}
+.help p {
+  font-size: 13px;
+  line-height: 1.4;
+}
+.help strong {
+  color: #fff;
+  opacity: 1;
+}
+.help #help-close {
+  margin-top: 12px;
 }

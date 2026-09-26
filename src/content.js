@@ -20,6 +20,12 @@
   // Same inlining pattern as REPORT_CSS, for src/ai-report-instructions.txt -
   // kept as its own real text file rather than a string buried in here.
   const AI_INSTRUCTIONS = "__AI_INSTRUCTIONS_PLACEHOLDER__";
+  // Same pattern again, for src/help.html - kept as its own file so the
+  // in-panel help content is distinct from the panel's own source code.
+  const HELP_HTML = "__HELP_HTML_PLACEHOLDER__";
+  // Comes from package.json at build time - one source of truth for the
+  // version shown in the panel.
+  const APP_VERSION = "__VERSION_PLACEHOLDER__";
 
   // crypto.randomUUID() needs a secure context - fine on https, but this
   // extension's whole pitch is "works on any site", including plain http
@@ -123,6 +129,9 @@
   // to), otherwise a specific comment's id, so the message renders inside
   // that comment's own card instead.
   let captureErrorCommentId = null;
+  // Whether the help page is showing instead of the normal panel body -
+  // never persisted, always starts closed on a fresh injection.
+  let showHelp = false;
 
   function currentPageKey() {
     return location.origin + location.pathname + location.search;
@@ -853,17 +862,9 @@ ${lightboxTargets.join("\n")}
     const pageComments = getPageComments();
     const totalCount = totalCommentCount();
 
-    panelRoot.innerHTML = `
-      <div class="resizer"></div>
-      <div class="panel">
-        <div class="panel-header">
-          <div class="panel-title">
-            <img src="${LOGO_URL}" alt="" class="logo" />
-            <h2>ALAN Review Tool</h2>
-          </div>
-          <button id="close" type="button" class="round-btn round-btn-grey" title="Close">×</button>
-        </div>
-
+    const bodyHtml = showHelp
+      ? `<div class="help">${HELP_HTML}</div>`
+      : `
         <div class="session-info">
           <div class="session-top">
             <div class="session-text">
@@ -904,6 +905,24 @@ ${lightboxTargets.join("\n")}
         <div class="comments">
           ${pageComments.map(renderComment).join("")}
         </div>
+      `;
+
+    panelRoot.innerHTML = `
+      <div class="resizer"></div>
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <img src="${LOGO_URL}" alt="" class="logo" />
+            <h2>ALAN Review Tool</h2>
+            <span class="version">(v${APP_VERSION})</span>
+          </div>
+          <div class="header-actions">
+            <button id="help-toggle" type="button" class="round-btn round-btn-grey" title="Help">?</button>
+            <button id="close" type="button" class="round-btn round-btn-grey" title="Close">×</button>
+          </div>
+        </div>
+
+        ${bodyHtml}
       </div>
     `;
     wireEvents();
@@ -927,12 +946,23 @@ ${lightboxTargets.join("\n")}
       restorePage();
     });
 
+    shadow.getElementById("help-toggle").addEventListener("click", () => {
+      showHelp = true;
+      render();
+    });
+    // Only present when the help view itself is showing - everything else
+    // wired here belongs to the normal body, which help replaces entirely.
+    shadow.getElementById("help-close")?.addEventListener("click", () => {
+      showHelp = false;
+      render();
+    });
+
     shadow
       .getElementById("new-comment")
-      .addEventListener("click", handleNewComment);
+      ?.addEventListener("click", handleNewComment);
     shadow
       .getElementById("new-screenshot")
-      .addEventListener("click", handleNewScreenshot);
+      ?.addEventListener("click", handleNewScreenshot);
 
     shadow.getElementById("clear-session")?.addEventListener("click", () => {
       if (
