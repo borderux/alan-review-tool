@@ -311,12 +311,40 @@
     duplicateComment(source);
   });
 
+  // A contenteditable doesn't store line breaks as "\n" - pressing Enter
+  // wraps each new line in its own <div> ("line one<div>line two</div>"),
+  // and .textContent just concatenates every descendant text node with no
+  // separator between them, silently losing every line break. Walking the
+  // tree and inserting "\n" at each block boundary (and for a literal
+  // <br>) reconstructs what the user actually typed.
+  function getTextWithLineBreaks(el) {
+    let text = "";
+    function walk(node) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        text += node.nodeValue;
+        return;
+      }
+      if (node.nodeName === "BR") {
+        text += "\n";
+        return;
+      }
+      const isBlock = node.nodeName === "DIV" || node.nodeName === "P";
+      if (isBlock && text.length > 0 && !text.endsWith("\n")) text += "\n";
+      for (const child of node.childNodes) walk(child);
+    }
+    for (const child of el.childNodes) walk(child);
+    // An empty contenteditable's only child is often a placeholder <br>,
+    // which the walk above turns into a bare "\n" - that's not a real
+    // line break, just how the browser keeps an empty div focusable.
+    return text === "\n" ? "" : text;
+  }
+
   shadow.addEventListener("input", (event) => {
     const textEl = event.target.closest(".comment-text");
     if (!textEl) return;
     const comment = getPageComments().find((c) => String(c.id) === textEl.dataset.id);
     if (comment) {
-      comment.text = textEl.textContent;
+      comment.text = getTextWithLineBreaks(textEl);
       scheduleSave();
     }
   });
