@@ -824,6 +824,17 @@ ${pagesHtml}
 
       function onMouseMove(event) {
         if (!dragging) return;
+        if (event.buttons === 0) {
+          // The mouseup that should have ended this drag never reached
+          // us - most likely the button was released outside the browser
+          // window entirely, which is a real thing users do dragging
+          // near a screen edge. A mousemove landing back on the page
+          // with no buttons held means it's already been released, so
+          // finish here instead of leaving the drag - and the panel,
+          // hidden this whole time - stuck forever.
+          onMouseUp(event);
+          return;
+        }
         const rect = currentRect(event);
         box.style.left = `${rect.x}px`;
         box.style.top = `${rect.y}px`;
@@ -846,16 +857,27 @@ ${pagesHtml}
         }
       }
 
+      // The buttons===0 check in onMouseMove only recovers once the mouse
+      // comes back over the page - if focus leaves the window entirely
+      // (alt-tab, clicking another app) and never returns, no mousemove
+      // ever fires again. This is the other half of that same safety net.
+      function onWindowBlur() {
+        cleanup();
+        resolve(null);
+      }
+
       function cleanup() {
         overlay.remove();
         host.style.visibility = "visible";
         document.removeEventListener("keydown", onKeyDown, true);
+        window.removeEventListener("blur", onWindowBlur);
       }
 
       overlay.addEventListener("mousedown", onMouseDown);
       overlay.addEventListener("mousemove", onMouseMove);
       overlay.addEventListener("mouseup", onMouseUp);
       document.addEventListener("keydown", onKeyDown, true);
+      window.addEventListener("blur", onWindowBlur);
     });
   }
 
