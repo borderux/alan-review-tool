@@ -47,6 +47,47 @@
   const shadow = host.attachShadow({ mode: "open" });
   const isFirefox = navigator.userAgent.includes("Firefox");
 
+  function openLightbox(src) {
+    const overlay = document.createElement("div");
+    overlay.style.all = "initial";
+    overlay.style.position = "fixed";
+    overlay.style.inset = "0";
+    overlay.style.zIndex = "2147483647";
+    overlay.style.background = "rgba(0, 0, 0, 0.85)";
+    overlay.style.display = "flex";
+    overlay.style.alignItems = "center";
+    overlay.style.justifyContent = "center";
+    overlay.style.cursor = "zoom-out";
+
+    const img = document.createElement("img");
+    img.src = src;
+    img.style.maxWidth = "90vw";
+    img.style.maxHeight = "90vh";
+    img.style.boxShadow = "0 4px 24px rgba(0, 0, 0, 0.5)";
+    overlay.appendChild(img);
+
+    function onKeyDown(event) {
+      if (event.key === "Escape") close();
+    }
+    function close() {
+      overlay.remove();
+      document.removeEventListener("keydown", onKeyDown, true);
+    }
+
+    overlay.addEventListener("click", close);
+    document.addEventListener("keydown", onKeyDown, true);
+    document.documentElement.appendChild(overlay);
+  }
+
+  // Delegated and attached once, here, rather than in wireEvents(): render()
+  // replaces the shadow root's entire innerHTML on every state change, which
+  // would tear down and re-add a direct listener each time. The shadow root
+  // itself never gets replaced, so a listener on it survives every render.
+  shadow.addEventListener("click", (event) => {
+    const thumb = event.target.closest(".thumb");
+    if (thumb) openLightbox(thumb.src);
+  });
+
   // In-memory only - lost on close/navigation, same as the rest of this
   // session's state. Persisting a review session across page loads is a
   // separate, bigger feature (see the activeTab-vs-host-permissions thread).
@@ -144,9 +185,12 @@
           flex-wrap: wrap;
         }
         .thumb {
-          max-width: 100%;
+          display: block;
+          max-width: 100px;
+          max-height: 100px;
           border-radius: 4px;
           border: 1px solid rgba(255, 255, 255, 0.2);
+          cursor: zoom-in;
         }
         .capture-error {
           color: #ff8080;
