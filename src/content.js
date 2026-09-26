@@ -27,10 +27,14 @@
   // getRandomValues() isn't restricted that way, so it's the fallback
   // instead of reaching for Math.random().
   function generateGuid() {
-    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+    if (typeof crypto !== "undefined" && crypto.randomUUID)
+      return crypto.randomUUID();
     const bytes = new Uint8Array(16);
-    if (typeof crypto !== "undefined" && crypto.getRandomValues) crypto.getRandomValues(bytes);
-    else for (let i = 0; i < 16; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+    if (typeof crypto !== "undefined" && crypto.getRandomValues)
+      crypto.getRandomValues(bytes);
+    else
+      for (let i = 0; i < 16; i += 1)
+        bytes[i] = Math.floor(Math.random() * 256);
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
     const hex = [...bytes].map((b) => b.toString(16).padStart(2, "0"));
@@ -57,8 +61,17 @@
     return;
   }
 
-  const stored = await chrome.storage.local.get([WIDTH_STORAGE_KEY, SESSION_STORAGE_KEY, USER_STORAGE_KEY, EMAIL_STORAGE_KEY]);
-  let panelWidth = clamp(stored[WIDTH_STORAGE_KEY] ?? DEFAULT_WIDTH, MIN_WIDTH, MAX_WIDTH);
+  const stored = await chrome.storage.local.get([
+    WIDTH_STORAGE_KEY,
+    SESSION_STORAGE_KEY,
+    USER_STORAGE_KEY,
+    EMAIL_STORAGE_KEY,
+  ]);
+  let panelWidth = clamp(
+    stored[WIDTH_STORAGE_KEY] ?? DEFAULT_WIDTH,
+    MIN_WIDTH,
+    MAX_WIDTH,
+  );
 
   // A single object under one key, not chrome.storage.local per comment:
   // this needs to work across every domain a review touches (that's the
@@ -121,7 +134,8 @@
   // by, and document.title can change later (SPA navigation, tab title
   // updates) so it has to be captured at the moment it's still accurate.
   function ensurePageEntry(key) {
-    if (!session.pages[key]) session.pages[key] = { title: document.title, comments: [] };
+    if (!session.pages[key])
+      session.pages[key] = { title: document.title, comments: [] };
     return session.pages[key];
   }
 
@@ -132,7 +146,10 @@
 
   function totalCommentCount() {
     if (!session) return 0;
-    return Object.values(session.pages).reduce((sum, page) => sum + page.comments.length, 0);
+    return Object.values(session.pages).reduce(
+      (sum, page) => sum + page.comments.length,
+      0,
+    );
   }
 
   function saveSession() {
@@ -156,12 +173,22 @@
   function scheduleUserInfoSave() {
     clearTimeout(userSaveTimer);
     userSaveTimer = setTimeout(() => {
-      chrome.storage.local.set({ [USER_STORAGE_KEY]: userName, [EMAIL_STORAGE_KEY]: userEmail });
+      chrome.storage.local.set({
+        [USER_STORAGE_KEY]: userName,
+        [EMAIL_STORAGE_KEY]: userEmail,
+      });
     }, 400);
   }
 
   function ensureSession() {
-    if (!session) session = { startedAt: Date.now(), guid: generateGuid(), commentCounter: 0, pages: {}, details: "" };
+    if (!session)
+      session = {
+        startedAt: Date.now(),
+        guid: generateGuid(),
+        commentCounter: 0,
+        pages: {},
+        details: "",
+      };
   }
 
   // The counter only ever goes up, even across deletes - CM-#### plus the
@@ -307,7 +334,11 @@
     function toCanvasPoint(event) {
       const rect = drawCanvas.getBoundingClientRect();
       const scale = drawCanvas.width / rect.width;
-      return { x: (event.clientX - rect.left) * scale, y: (event.clientY - rect.top) * scale, scale };
+      return {
+        x: (event.clientX - rect.left) * scale,
+        y: (event.clientY - rect.top) * scale,
+        scale,
+      };
     }
 
     drawCanvas.addEventListener("mousedown", (event) => {
@@ -455,7 +486,12 @@
   function handleNewComment() {
     ensureSession();
     const key = currentPageKey();
-    const comment = { id: Date.now(), commentNumber: nextCommentNumber(), text: "", screenshot: null };
+    const comment = {
+      id: Date.now(),
+      commentNumber: nextCommentNumber(),
+      text: "",
+      screenshot: null,
+    };
     // Newest first - every comment renders the same way regardless of
     // position, so nothing else needs to change about the rest of the list.
     ensurePageEntry(key).comments.unshift(comment);
@@ -483,7 +519,12 @@
       }
       ensureSession();
       const key = currentPageKey();
-      const comment = { id: Date.now(), commentNumber: nextCommentNumber(), text: "", screenshot: result.dataUrl };
+      const comment = {
+        id: Date.now(),
+        commentNumber: nextCommentNumber(),
+        text: "",
+        screenshot: result.dataUrl,
+      };
       ensurePageEntry(key).comments.unshift(comment);
       saveSession();
       render();
@@ -502,7 +543,12 @@
   function duplicateComment(source) {
     if (!source) return;
     const key = currentPageKey();
-    const duplicate = { id: Date.now(), commentNumber: nextCommentNumber(), text: source.text, screenshot: source.screenshot };
+    const duplicate = {
+      id: Date.now(),
+      commentNumber: nextCommentNumber(),
+      text: source.text,
+      screenshot: source.screenshot,
+    };
     ensurePageEntry(key).comments.unshift(duplicate);
     captureError = null;
     captureErrorCommentId = null;
@@ -519,7 +565,9 @@
   shadow.addEventListener("click", (event) => {
     const thumb = event.target.closest(".thumb");
     if (thumb) {
-      const comment = getPageComments().find((c) => String(c.id) === thumb.dataset.id);
+      const comment = getPageComments().find(
+        (c) => String(c.id) === thumb.dataset.id,
+      );
       if (comment) openLightbox(comment);
       return;
     }
@@ -532,7 +580,9 @@
 
     const captureIconBtn = event.target.closest(".capture-btn-icon");
     if (captureIconBtn) {
-      const comment = getPageComments().find((c) => String(c.id) === captureIconBtn.dataset.id);
+      const comment = getPageComments().find(
+        (c) => String(c.id) === captureIconBtn.dataset.id,
+      );
       if (comment) handleCapture(comment);
       return;
     }
@@ -553,7 +603,10 @@
     // target literally the container itself) rather than "nothing else
     // matched", so it can never fire for a click on session-info or the
     // toolbar buttons, which have their own dedicated handlers elsewhere.
-    if (event.target === shadow.querySelector(".panel") || event.target === shadow.querySelector(".comments")) {
+    if (
+      event.target === shadow.querySelector(".panel") ||
+      event.target === shadow.querySelector(".comments")
+    ) {
       handleNewComment();
     }
   });
@@ -571,8 +624,11 @@
     const card = textEl.closest(".comment-item");
     if (event.relatedTarget && card?.contains(event.relatedTarget)) return;
 
-    const comment = getPageComments().find((c) => String(c.id) === textEl.dataset.id);
-    if (comment && !comment.text.trim() && !comment.screenshot) deleteComment(comment.id);
+    const comment = getPageComments().find(
+      (c) => String(c.id) === textEl.dataset.id,
+    );
+    if (comment && !comment.text.trim() && !comment.screenshot)
+      deleteComment(comment.id);
   });
 
   shadow.addEventListener("paste", (event) => {
@@ -580,7 +636,9 @@
     if (!target) return;
     event.preventDefault();
 
-    const source = getPageComments().find((c) => String(c.id) === target.dataset.id);
+    const source = getPageComments().find(
+      (c) => String(c.id) === target.dataset.id,
+    );
     duplicateComment(source);
   });
 
@@ -615,7 +673,9 @@
   shadow.addEventListener("input", (event) => {
     const textEl = event.target.closest(".comment-text");
     if (textEl) {
-      const comment = getPageComments().find((c) => String(c.id) === textEl.dataset.id);
+      const comment = getPageComments().find(
+        (c) => String(c.id) === textEl.dataset.id,
+      );
       if (comment) {
         comment.text = getTextWithLineBreaks(textEl);
         scheduleSave();
@@ -653,7 +713,10 @@
         const detailsEl = shadow.getElementById("session-details");
         if (detailsEl) {
           detailsEl.focus();
-          detailsEl.setSelectionRange(detailsEl.value.length, detailsEl.value.length);
+          detailsEl.setSelectionRange(
+            detailsEl.value.length,
+            detailsEl.value.length,
+          );
         }
       } else {
         autoGrowTextarea(event.target);
@@ -662,7 +725,9 @@
   });
 
   function buildReportHtml() {
-    const pages = Object.entries(session?.pages || {}).filter(([, page]) => page.comments.length > 0);
+    const pages = Object.entries(session?.pages || {}).filter(
+      ([, page]) => page.comments.length > 0,
+    );
     const totalCount = totalCommentCount();
     const pageCount = pages.length;
 
@@ -672,7 +737,10 @@
     const lightboxTargets = [];
 
     const tocHtml = pages
-      .map(([url], i) => `<li><a href="#page-${i}">${escapeHtml(url.split("?")[0])}</a></li>`)
+      .map(
+        ([url], i) =>
+          `<li><a href="#page-${i}">${escapeHtml(url.split("?")[0])}</a></li>`,
+      )
       .join("\n");
 
     const pagesHtml = pages
@@ -695,7 +763,10 @@
             // The visible CM-#### id plus the hidden session guid (in the
             // head, once) together make a globally unique id per comment -
             // shown here since that's the ask, unlike the guid itself.
-            const commentId = comment.commentNumber != null ? formatCommentId(comment.commentNumber) : "";
+            const commentId =
+              comment.commentNumber != null
+                ? formatCommentId(comment.commentNumber)
+                : "";
             return `<div class="comment" data-comment-id="${escapeHtml(commentId)}"><div class="comment-body">${commentId ? `<p class="comment-id">${escapeHtml(commentId)}</p>` : ""}<p class="comment-text">${escapeHtml(comment.text).replace(/\n/g, "<br>")}</p></div>${shotsHtml}</div>`;
           })
           .join("\n");
@@ -851,17 +922,28 @@ ${lightboxTargets.join("\n")}
       restorePage();
     });
 
-    shadow.getElementById("new-comment").addEventListener("click", handleNewComment);
-    shadow.getElementById("new-screenshot").addEventListener("click", handleNewScreenshot);
+    shadow
+      .getElementById("new-comment")
+      .addEventListener("click", handleNewComment);
+    shadow
+      .getElementById("new-screenshot")
+      .addEventListener("click", handleNewScreenshot);
 
     shadow.getElementById("clear-session")?.addEventListener("click", () => {
-      if (!confirm("Clear the current session? This removes every comment across every page.")) return;
+      if (
+        !confirm(
+          "Clear the current session? This removes every comment across every page.",
+        )
+      )
+        return;
       session = null;
       saveSession();
       render();
     });
 
-    shadow.getElementById("download-report")?.addEventListener("click", downloadReport);
+    shadow
+      .getElementById("download-report")
+      ?.addEventListener("click", downloadReport);
 
     const resizer = shadow.querySelector(".resizer");
     resizer.addEventListener("mousedown", (mouseDownEvent) => {
@@ -1020,7 +1102,9 @@ ${lightboxTargets.join("\n")}
   async function sendCaptureRequest(attempts = 3, delayMs = 200) {
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       try {
-        return await chrome.runtime.sendMessage({ type: "alan-review-tool:capture" });
+        return await chrome.runtime.sendMessage({
+          type: "alan-review-tool:capture",
+        });
       } catch (err) {
         if (attempt === attempts) throw err;
         await new Promise((r) => setTimeout(r, delayMs));
@@ -1032,11 +1116,15 @@ ${lightboxTargets.join("\n")}
     // Give the compositor a couple of frames to actually paint the panel as
     // hidden before the screenshot is taken - otherwise a still-visible
     // panel from the previous frame can end up in the captured pixels.
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await new Promise((r) =>
+      requestAnimationFrame(() => requestAnimationFrame(r)),
+    );
 
     const response = await sendCaptureRequest();
     if (!response?.dataUrl) {
-      return { error: response?.error || "the background worker returned nothing" };
+      return {
+        error: response?.error || "the background worker returned nothing",
+      };
     }
 
     const dpr = window.devicePixelRatio || 1;

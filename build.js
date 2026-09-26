@@ -11,7 +11,10 @@ const DIST = path.join(__dirname, "dist");
 // placeholder-token swap.
 const INLINES = [
   { file: "report.css", placeholder: '"__REPORT_CSS_PLACEHOLDER__"' },
-  { file: "ai-report-instructions.txt", placeholder: '"__AI_INSTRUCTIONS_PLACEHOLDER__"' },
+  {
+    file: "ai-report-instructions.txt",
+    placeholder: '"__AI_INSTRUCTIONS_PLACEHOLDER__"',
+  },
 ];
 
 const SHARED_FILES = ["background.js", "content.js", "content.css"];
@@ -38,7 +41,9 @@ for (const [browser, manifestFile] of Object.entries(TARGETS)) {
       let content = fs.readFileSync(srcPath, "utf8");
       for (const { placeholder, literal } of inlineLiterals) {
         if (!content.includes(placeholder)) {
-          throw new Error(`content.js is missing the ${placeholder} placeholder - a source file can't be inlined`);
+          throw new Error(
+            `content.js is missing the ${placeholder} placeholder - a source file can't be inlined`,
+          );
         }
         content = content.replace(placeholder, literal);
       }
@@ -48,7 +53,10 @@ for (const [browser, manifestFile] of Object.entries(TARGETS)) {
     }
   }
 
-  fs.copyFileSync(path.join(SRC, manifestFile), path.join(outDir, "manifest.json"));
+  fs.copyFileSync(
+    path.join(SRC, manifestFile),
+    path.join(outDir, "manifest.json"),
+  );
 }
 
 console.log("Built extension bundles into dist/chrome and dist/firefox");

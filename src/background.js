@@ -9,7 +9,10 @@ chrome.action.onClicked.addListener(async (tab) => {
     // chrome://, the Web Store, and the PDF viewer refuse injection even with
     // activeTab — surface that instead of failing silently on click.
     console.error("Alan Review Tool: could not inject into this tab.", err);
-    await chrome.action.setBadgeBackgroundColor({ tabId: tab.id, color: "#d33" });
+    await chrome.action.setBadgeBackgroundColor({
+      tabId: tab.id,
+      color: "#d33",
+    });
     await chrome.action.setBadgeText({ tabId: tab.id, text: "!" });
   }
 });
@@ -23,7 +26,11 @@ chrome.action.onClicked.addListener(async (tab) => {
 // a rejected promise crossing the sendMessage channel is exactly the kind of
 // failure that vanishes silently on the content-script side otherwise.
 chrome.runtime.onMessage.addListener((message, sender) => {
-  if (message?.type !== "alan-review-tool:capture" || sender.tab?.windowId == null) return;
+  if (
+    message?.type !== "alan-review-tool:capture" ||
+    sender.tab?.windowId == null
+  )
+    return;
   return chrome.tabs
     .captureVisibleTab(sender.tab.windowId, { format: "png" })
     .then((dataUrl) => ({ dataUrl }))

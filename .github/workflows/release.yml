@@ -1,0 +1,77 @@
+# Release Workflow
+#
+# This repo is a private, unpublished browser extension (no npm registry
+# publish, no Turborepo, no build-artifact upload) - so unlike the standard
+# @recursica package release workflow this is based on, there's nothing for
+# `npm run release` (`changeset publish`) to actually publish. Changesets
+# skips publishing for any package marked "private": true automatically, so
+# that step safely no-ops. What still matters, and is why this workflow
+# exists at all: Changesets versions package.json, writes CHANGELOG.md, and
+# opens/updates a "Version Packages" PR whenever a changeset lands on main -
+# that's the actual release-tracking value here, publish or not.
+#
+# How it works:
+# 1. Triggers on changes to .changeset/, src/, or package files on main
+# 2. Uses Changesets to detect whether there's a version bump pending
+# 3. If changesets are present, opens/updates a "Version Packages" PR
+# 4. When that PR is merged, runs `npm run release` (a no-op publish, since
+#    this package is private) and tags the release
+
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".changeset/**"
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # To create releases and tags
+      pull-requests: write # To create pull requests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          HUSKY: 0
+
+      # Build before releasing so a broken build blocks the release the same
+      # way it blocks a PR, and so dist/ is current if it's ever attached to
+      # a GitHub release by hand later.
+      - name: Build
+        run: npm run build
+
+      # Changesets Action - The Core of Our Release System
+      #
+      # This action has two modes:
+      # 1. If changesets are present, it creates a "Version Packages" pull request.
+      # 2. When the "Version Packages" PR is merged, it runs the `publish` command.
+      #
+      # The `publish` command executes `npm run release` (`changeset publish`) -
+      # since this package is private, Changesets skips the actual publish step
+      # but still tags the release and lets this action create the GitHub release.
+      - name: Create Release Pull Request or Publish to npm
+        uses: changesets/action@v1
+        with:
+          publish: npm run release
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
