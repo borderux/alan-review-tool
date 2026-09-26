@@ -35,7 +35,7 @@
   }
 
   function formatCommentId(n) {
-    return `CM-${String(n).padStart(4, "0")}`;
+    return `CM-${n}`;
   }
 
   function restorePage() {
@@ -669,7 +669,7 @@
     const lightboxTargets = [];
 
     const tocHtml = pages
-      .map(([url, page], i) => `<li><a href="#page-${i}">${escapeHtml(page.title || url)}</a></li>`)
+      .map(([url], i) => `<li><a href="#page-${i}">${escapeHtml(url.split("?")[0])}</a></li>`)
       .join("\n");
 
     const pagesHtml = pages
