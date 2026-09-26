@@ -10,6 +10,8 @@
 
   const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
+  const CAMERA_SVG = `<svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>`;
+
   function restorePage() {
     html.style.width = html.dataset.alanReviewToolPrevWidth || "";
     html.style.transition = html.dataset.alanReviewToolPrevTransition || "";
@@ -144,61 +146,10 @@
     document.documentElement.appendChild(overlay);
   }
 
-  function flashButton(buttonEl, label) {
-    const original = buttonEl.textContent;
-    buttonEl.textContent = label;
-    buttonEl.disabled = true;
-    setTimeout(() => {
-      buttonEl.textContent = original;
-      buttonEl.disabled = false;
-    }, 1200);
-  }
-
   function escapeHtml(str) {
     const div = document.createElement("div");
     div.textContent = str;
     return div.innerHTML;
-  }
-
-  // One ClipboardItem, several representations - a paste target picks
-  // exactly one (Chrome doesn't support multiple ClipboardItems in a
-  // single write, confirmed directly in the earlier thread), so this
-  // offers text/html (comment text plus an inline <img>), text/plain (a
-  // markdown fallback), and image/png so an image-preferring target has a
-  // real image to pick instead of a wall of base64.
-  async function copyCommentToClipboard(comment, buttonEl) {
-    const html = `${comment.text ? `<p>${escapeHtml(comment.text)}</p>` : ""}${
-      comment.screenshot ? `<img src="${comment.screenshot}" alt="Screenshot" />` : ""
-    }`;
-    const plain = `${comment.text || ""}${
-      comment.screenshot ? `\n\n![Screenshot](${comment.screenshot})` : ""
-    }`.trim();
-
-    const representations = {
-      "text/html": new Blob([html], { type: "text/html" }),
-      "text/plain": new Blob([plain], { type: "text/plain" }),
-    };
-    // Chrome's clipboard.write() rejects image/jpeg outright ("Type
-    // image/jpeg not supported on write" - confirmed directly), regardless
-    // of what format is actually stored. Re-encode to PNG here, on the way
-    // out to the clipboard only - the smaller JPEG stays what's stored and
-    // downloaded.
-    if (comment.screenshot) {
-      const img = await loadImage(comment.screenshot);
-      const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      canvas.getContext("2d").drawImage(img, 0, 0);
-      representations["image/png"] = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-    }
-
-    try {
-      await navigator.clipboard.write([new ClipboardItem(representations)]);
-      flashButton(buttonEl, "Copied!");
-    } catch (err) {
-      console.error("Alan Review Tool: clipboard write failed.", err);
-      flashButton(buttonEl, "Copy failed");
-    }
   }
 
   function deleteComment(id) {
@@ -259,14 +210,24 @@
       return;
     }
 
-    const copyBtn = event.target.closest(".copy-btn");
-    if (copyBtn) {
-      const comment = getPageComments().find((c) => String(c.id) === copyBtn.dataset.id);
-      if (comment) copyCommentToClipboard(comment, copyBtn);
+    // The active comment's X clears its draft in place rather than
+    // deleting it - the slot stays active and ready for input again. A
+    // read-only comment's X is a real delete, since there's no "draft" to
+    // go back to once it's no longer the one being actively edited.
+    const clearActiveBtn = event.target.closest(".delete-active");
+    if (clearActiveBtn) {
+      const comment = getPageComments().find((c) => c.id === activeCommentId);
+      if (comment) {
+        comment.text = "";
+        comment.screenshot = null;
+        captureError = null;
+        saveSession();
+        render();
+      }
       return;
     }
 
-    const deleteBtn = event.target.closest(".delete-active, .delete-comment");
+    const deleteBtn = event.target.closest(".delete-comment");
     if (deleteBtn) {
       deleteComment(Number(deleteBtn.dataset.id));
       return;
@@ -342,15 +303,13 @@ ${pagesHtml}
   function renderActiveComment(comment) {
     return `
       <div class="active-comment">
+        <button class="delete-active" type="button" data-id="${comment.id}" title="Clear this comment">×</button>
         <textarea id="active-comment-text" placeholder="What's the feedback?">${escapeHtml(comment.text)}</textarea>
-        <div class="active-comment-controls">
-          <button class="delete-active" type="button" data-id="${comment.id}" title="Delete this comment">×</button>
-          ${
-            comment.screenshot
-              ? `<img class="thumb" src="${comment.screenshot}" alt="Captured region" />`
-              : `<button class="capture-btn-icon" type="button" title="Capture screenshot">📷</button>`
-          }
-        </div>
+        ${
+          comment.screenshot
+            ? `<img class="thumb" src="${comment.screenshot}" alt="Captured region" />`
+            : `<button class="capture-btn-icon" type="button" title="Capture screenshot">${CAMERA_SVG}</button>`
+        }
       </div>
       ${captureError ? `<p class="capture-error">Couldn't capture a screenshot: ${escapeHtml(captureError)}</p>` : ""}
     `;
@@ -362,7 +321,6 @@ ${pagesHtml}
         <button class="delete-comment" type="button" data-id="${comment.id}" title="Delete this comment">×</button>
         <div class="readonly-text" data-id="${comment.id}" contenteditable="true">${escapeHtml(comment.text)}</div>
         ${comment.screenshot ? `<img class="thumb" src="${comment.screenshot}" alt="Captured region" />` : ""}
-        <button class="copy-btn" type="button" data-id="${comment.id}">Copy to clipboard</button>
       </div>
     `;
   }

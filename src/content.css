@@ -70,28 +70,26 @@ button:disabled {
   width: 100%;
 }
 
+/* Active and read-only comments share one visual treatment - a card with
+   a lighter-grey border so it's visible against the panel's own subtle
+   background tint, and the same upper-right delete X in both. They only
+   differ in what's editable and how (live textarea vs. contenteditable). */
+.active-comment,
+.comment-item {
+  position: relative;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 8px;
+}
 .active-comment {
   margin-top: 12px;
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-}
-.active-comment textarea {
-  flex: 1;
-  min-height: 70px;
-  box-sizing: border-box;
-  font-family: inherit;
-  font-size: 13px;
-  padding: 6px;
-}
-.active-comment-controls {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
 }
 .delete-active,
 .delete-comment {
+  position: absolute;
+  top: -6px;
+  right: -6px;
   width: 22px;
   height: 22px;
   padding: 0;
@@ -101,13 +99,26 @@ button:disabled {
   color: #fff;
   border: none;
 }
+.active-comment textarea {
+  display: block;
+  width: 100%;
+  min-height: 70px;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 6px;
+}
 .capture-btn-icon {
-  font-size: 16px;
-  padding: 4px 8px;
+  display: inline-flex;
+  margin-top: 6px;
+  background: none;
+  border: none;
+  padding: 4px;
 }
 
 .thumb {
   display: block;
+  margin-top: 6px;
   max-width: 100px;
   max-height: 100px;
   border-radius: 4px;
@@ -125,17 +136,6 @@ button:disabled {
   flex-direction: column;
   gap: 12px;
 }
-.comment-item {
-  position: relative;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 6px;
-  padding: 8px;
-}
-.comment-item .delete-comment {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-}
 .readonly-text {
   font-size: 13px;
   opacity: 1;
@@ -148,7 +148,4 @@ button:disabled {
 .readonly-text:focus {
   background: rgba(255, 255, 255, 0.08);
   outline: none;
-}
-.comment-item .copy-btn {
-  margin-top: 6px;
 }
