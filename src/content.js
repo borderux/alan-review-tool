@@ -17,6 +17,9 @@
   // as its own source file rather than a hand-maintained string here, so
   // report styling can be edited (and linted) like any other stylesheet.
   const REPORT_CSS = "__REPORT_CSS_PLACEHOLDER__";
+  // Same inlining pattern as REPORT_CSS, for src/ai-report-instructions.txt -
+  // kept as its own real text file rather than a string buried in here.
+  const AI_INSTRUCTIONS = "__AI_INSTRUCTIONS_PLACEHOLDER__";
 
   // crypto.randomUUID() needs a secure context - fine on https, but this
   // extension's whole pitch is "works on any site", including plain http
@@ -715,6 +718,7 @@ ${commentsHtml}
 <meta charset="utf-8">
 <title>Feedback session</title>
 ${session?.guid ? `<meta name="alan-review-session-id" content="${escapeHtml(session.guid)}">` : ""}
+<meta name="ai-report-instructions" content="${escapeHtml(AI_INSTRUCTIONS)}">
 <style>${REPORT_CSS}</style>
 </head>
 <body>
