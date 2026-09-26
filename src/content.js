@@ -60,6 +60,11 @@
   shadow.appendChild(styleLink);
 
   const panelRoot = document.createElement("div");
+  // A percentage height only resolves against an ancestor with an explicit
+  // height - without this, .panel's height: 100% (in content.css) has
+  // nothing to resolve against and collapses to its content's size instead
+  // of filling the host, which is exactly the regression this introduced.
+  panelRoot.style.height = "100%";
   shadow.appendChild(panelRoot);
 
   function openLightbox(src) {
