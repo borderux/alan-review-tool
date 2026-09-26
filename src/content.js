@@ -124,8 +124,19 @@
     // image/png can only ever carry one representation - the platform
     // limitation from the earlier thread, not new here. First shot only;
     // the rest still travel in the html/plain fallbacks above.
+    //
+    // Also confirmed directly: Chrome's clipboard.write() rejects
+    // image/jpeg outright ("Type image/jpeg not supported on write"),
+    // regardless of what format the stored screenshot uses. Re-encode to
+    // PNG here, on the way out to the clipboard only - the smaller JPEG
+    // stays what's actually stored and downloaded.
     if (comment.screenshots.length) {
-      representations["image/png"] = await (await fetch(comment.screenshots[0])).blob();
+      const img = await loadImage(comment.screenshots[0]);
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext("2d").drawImage(img, 0, 0);
+      representations["image/png"] = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
     }
 
     try {
@@ -180,37 +191,42 @@
   // there's only one thing to hand over, and it carries everything
   // (comments and their inline screenshots) rather than making a paste
   // target choose between them.
-  // Neutralizes raw HTML in a comment (a literal "<script>" typed by a
-  // reviewer, or copied off the page under review) without escaping
-  // ordinary markdown syntax - most markdown renderers pass raw HTML
-  // through unchanged, which is the same risk the HTML report already
-  // guarded against, just via CommonMark's own rules instead of the DOM's.
-  function escapeAngleBrackets(str) {
-    return str.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-
-  function buildReportMarkdown() {
-    const commentsMd = comments
+  // Markdown's one big win - inline images - turned out to be its problem
+  // too: a data URI can't be wrapped across lines without breaking it, so
+  // a real screenshot became a single ~90,000-character line, which is
+  // exactly the shape that breaks editor tooling like VS Code's preview.
+  // Back to HTML, but deliberately minimal - no <style>, no nested
+  // wrappers beyond what the structure needs - so it stays easy to parse
+  // rather than becoming the styled page the first version was.
+  function buildReportHtml() {
+    const commentsHtml = comments
       .map((comment, index) => {
-        const images = comment.screenshots.map((shot) => `\n\n![Screenshot](${shot})`).join("");
-        return `## Comment ${index + 1}\n\n${escapeAngleBrackets(comment.text)}${images}`;
+        const images = comment.screenshots.map((shot) => `<img src="${shot}">`).join("\n");
+        return `<div class="comment">
+<h2>Comment ${index + 1}</h2>
+<p>${escapeHtml(comment.text).replace(/\n/g, "<br>")}</p>
+${images}
+</div>`;
       })
-      .join("\n\n");
+      .join("\n");
 
-    return `# Feedback for ${location.hostname}
-
-_Captured ${new Date().toLocaleString()} — ${comments.length} comment${comments.length === 1 ? "" : "s"}_
-
-${commentsMd}
+    return `<!doctype html>
+<html>
+<body>
+<h1>Feedback for ${escapeHtml(location.hostname)}</h1>
+<p>Captured ${new Date().toLocaleString()} — ${comments.length} comment${comments.length === 1 ? "" : "s"}</p>
+${commentsHtml}
+</body>
+</html>
 `;
   }
 
   function downloadReport() {
-    const blob = new Blob([buildReportMarkdown()], { type: "text/markdown" });
+    const blob = new Blob([buildReportHtml()], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `alan-review-${location.hostname}-${Date.now()}.md`;
+    a.download = `alan-review-${location.hostname}-${Date.now()}.html`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -622,7 +638,12 @@ ${commentsMd}
       rect.width * dpr,
       rect.height * dpr,
     );
-    return { dataUrl: canvas.toDataURL("image/png") };
+    // JPEG rather than PNG - a UI screenshot has enough photographic-ish
+    // gradients (shadows, anti-aliased text) that lossy compression saves
+    // real space, and the base64 bloat was the whole complaint that sent
+    // us back from Markdown. 0.85 keeps text legible; PNG's lossless
+    // fidelity was never load-bearing for a review screenshot.
+    return { dataUrl: canvas.toDataURL("image/jpeg", 0.85) };
   }
 
   render();
