@@ -62,10 +62,6 @@ button:disabled {
   background: #999;
   color: #1e1e2e;
 }
-.round-btn-red {
-  background: #d33;
-  color: #fff;
-}
 #close.round-btn {
   width: 26px;
   height: 26px;
@@ -77,6 +73,8 @@ button:disabled {
   padding: 8px 0;
   border-top: 1px solid rgba(255, 255, 255, 0.15);
   border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+.session-top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -112,10 +110,18 @@ button:disabled {
 }
 #session-details {
   display: block;
+  /* Spans the full session area (both the text and actions columns
+     above), not just .session-top's left column - a block-level sibling
+     after a flex row naturally takes the full width of their shared
+     parent (.session-info) on its own line. */
   width: 100%;
   box-sizing: border-box;
-  margin-top: 6px;
-  min-height: 2.8em;
+  margin-top: 8px;
+  /* Exactly 2 lines at this explicit line-height, not an approximation
+     via a plain em value on an inherited/default line-height - 2 lines
+     plus the box's own vertical padding. */
+  line-height: 1.4;
+  min-height: calc(2 * 1.4em + 8px);
   font-family: inherit;
   font-size: 13px;
   background: rgba(255, 255, 255, 0.06);

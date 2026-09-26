@@ -492,7 +492,7 @@ ${pagesHtml}
   function renderComment(comment) {
     return `
       <div class="comment-item">
-        <button class="delete-comment round-btn round-btn-red" type="button" data-id="${comment.id}" title="Delete this comment">×</button>
+        <button class="delete-comment round-btn round-btn-grey" type="button" data-id="${comment.id}" title="Delete this comment">×</button>
         <div class="comment-text" data-id="${comment.id}" contenteditable="true">${escapeHtml(comment.text)}</div>
         ${
           comment.screenshot
@@ -521,27 +521,29 @@ ${pagesHtml}
         </div>
 
         <div class="session-info">
-          <div class="session-text">
-            ${
-              session
-                ? `<p>Session started ${new Date(session.startedAt).toLocaleString()}</p>
-                   <p>${totalCount} comment${totalCount === 1 ? "" : "s"}</p>`
-                : `<p>No active session yet</p>`
-            }
-            <label class="field-row">
-              <span>User:</span>
-              <input type="text" id="user-name-input" value="${escapeHtml(userName)}" placeholder="Your name" />
-            </label>
-            <label class="field-row">
-              <span>Email:</span>
-              <input type="text" id="user-email-input" value="${escapeHtml(userEmail)}" placeholder="you@example.com" />
-            </label>
-            <textarea id="session-details" placeholder="Session details (what's being reviewed, context, etc.)">${escapeHtml(session?.details || "")}</textarea>
+          <div class="session-top">
+            <div class="session-text">
+              ${
+                session
+                  ? `<p>Session started ${new Date(session.startedAt).toLocaleString()}</p>
+                     <p>${totalCount} comment${totalCount === 1 ? "" : "s"}</p>`
+                  : `<p>No active session yet</p>`
+              }
+              <label class="field-row">
+                <span>User:</span>
+                <input type="text" id="user-name-input" value="${escapeHtml(userName)}" placeholder="Your name" />
+              </label>
+              <label class="field-row">
+                <span>Email:</span>
+                <input type="text" id="user-email-input" value="${escapeHtml(userEmail)}" placeholder="you@example.com" />
+              </label>
+            </div>
+            <div class="session-actions">
+              <button id="clear-session" type="button" ${session ? "" : "disabled"}>Clear Session</button>
+              <button id="download-report" type="button" ${totalCount ? "" : "disabled"}>Download report</button>
+            </div>
           </div>
-          <div class="session-actions">
-            <button id="clear-session" type="button" ${session ? "" : "disabled"}>Clear Session</button>
-            <button id="download-report" type="button" ${totalCount ? "" : "disabled"}>Download report</button>
-          </div>
+          <textarea id="session-details" placeholder="Session details (what's being reviewed, context, etc.)">${escapeHtml(session?.details || "")}</textarea>
         </div>
 
         <div class="toolbar">
