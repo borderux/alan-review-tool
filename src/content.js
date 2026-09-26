@@ -362,13 +362,29 @@
     });
   }
 
+  // The MV3 background service worker unloads after ~30s idle and wakes on
+  // the next message - but the message that wakes it can itself lose that
+  // race and fail with "Receiving end does not exist" before its listener
+  // has finished registering. A short retry almost always lands after it's
+  // awake, without needing anything to keep it alive artificially.
+  async function sendCaptureRequest(attempts = 3, delayMs = 200) {
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        return await chrome.runtime.sendMessage({ type: "alan-review-tool:capture" });
+      } catch (err) {
+        if (attempt === attempts) throw err;
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+    }
+  }
+
   async function captureAndCrop(rect) {
     // Give the compositor a couple of frames to actually paint the panel as
     // hidden before the screenshot is taken - otherwise a still-visible
     // panel from the previous frame can end up in the captured pixels.
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-    const response = await chrome.runtime.sendMessage({ type: "alan-review-tool:capture" });
+    const response = await sendCaptureRequest();
     if (!response?.dataUrl) {
       return { error: response?.error || "the background worker returned nothing" };
     }
