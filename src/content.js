@@ -2,6 +2,7 @@
   const HOST_ID = "alan-review-tool-host";
   const OVERLAY_ID = "alan-review-tool-selection-overlay";
   const WIDTH_STORAGE_KEY = "alanReviewToolPanelWidth";
+  const SESSION_STORAGE_KEY = "alanReviewToolSession";
   const DEFAULT_WIDTH = 320;
   const MIN_WIDTH = 240;
   const MAX_WIDTH = 720;
@@ -25,8 +26,53 @@
     return;
   }
 
-  const stored = await chrome.storage.local.get(WIDTH_STORAGE_KEY);
+  const stored = await chrome.storage.local.get([WIDTH_STORAGE_KEY, SESSION_STORAGE_KEY]);
   let panelWidth = clamp(stored[WIDTH_STORAGE_KEY] ?? DEFAULT_WIDTH, MIN_WIDTH, MAX_WIDTH);
+
+  // A single object under one key, not chrome.storage.local per comment:
+  // this needs to work across every domain a review touches (that's the
+  // whole "any site" pitch), and a content script's own page-scoped
+  // localStorage is isolated per origin - it wouldn't see comments from a
+  // different site at all. chrome.storage.local is shared across every
+  // page this extension runs on, regardless of origin.
+  let session = stored[SESSION_STORAGE_KEY] || null;
+  // Which comment (if any) shows as the live textarea "stack top" rather
+  // than a read-only entry. Always starts null on a fresh injection - only
+  // clicking "+ New comment" activates one, even if this page already has
+  // comments from a previous visit.
+  let activeCommentId = null;
+  let captureError = null;
+
+  function currentPageKey() {
+    return location.origin + location.pathname + location.search;
+  }
+
+  function getPageComments() {
+    if (!session) return [];
+    return session.pages[currentPageKey()] || [];
+  }
+
+  function totalCommentCount() {
+    if (!session) return 0;
+    return Object.values(session.pages).reduce((sum, list) => sum + list.length, 0);
+  }
+
+  function saveSession() {
+    if (session) chrome.storage.local.set({ [SESSION_STORAGE_KEY]: session });
+    else chrome.storage.local.remove(SESSION_STORAGE_KEY);
+  }
+
+  // Structural changes (new/deleted comment, capture, clear) save
+  // immediately - they already trigger a render(), so there's no
+  // keystroke-rate concern. Plain typing goes through this instead: saving
+  // on every keystroke would hammer chrome.storage.local for no benefit,
+  // since "never lost" only needs to survive a pause in typing, not every
+  // single character.
+  let saveTimer = null;
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveSession, 400);
+  }
 
   html.dataset.alanReviewToolPrevWidth = html.style.width;
   html.dataset.alanReviewToolPrevTransition = html.style.transition;
@@ -45,7 +91,6 @@
   document.documentElement.appendChild(host);
 
   const shadow = host.attachShadow({ mode: "open" });
-  const isFirefox = navigator.userAgent.includes("Firefox");
 
   // The stylesheet loads once, here, rather than as a <style> block inside
   // render()'s template: render() replaces its target's entire innerHTML on
@@ -63,7 +108,7 @@
   // A percentage height only resolves against an ancestor with an explicit
   // height - without this, .panel's height: 100% (in content.css) has
   // nothing to resolve against and collapses to its content's size instead
-  // of filling the host, which is exactly the regression this introduced.
+  // of filling the host.
   panelRoot.style.height = "100%";
   shadow.appendChild(panelRoot);
 
@@ -99,10 +144,6 @@
     document.documentElement.appendChild(overlay);
   }
 
-  // Delegated and attached once, here, rather than in wireEvents(): render()
-  // replaces the shadow root's entire innerHTML on every state change, which
-  // would tear down and re-add a direct listener each time. The shadow root
-  // itself never gets replaced, so a listener on it survives every render.
   function flashButton(buttonEl, label) {
     const original = buttonEl.textContent;
     buttonEl.textContent = label;
@@ -113,45 +154,37 @@
     }, 1200);
   }
 
-  // Two representations in one ClipboardItem: text/html so a rich target
-  // (Docs, Slack, ChatGPT's input, Jira) shows the screenshot inline, and
-  // text/plain as a markdown fallback so a plain textarea still gets
-  // something legible instead of nothing. See the earlier thread for why
-  // this beats a Jira-API-shaped "backbone."
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // One ClipboardItem, several representations - a paste target picks
+  // exactly one (Chrome doesn't support multiple ClipboardItems in a
+  // single write, confirmed directly in the earlier thread), so this
+  // offers text/html (comment text plus an inline <img>), text/plain (a
+  // markdown fallback), and image/png so an image-preferring target has a
+  // real image to pick instead of a wall of base64.
   async function copyCommentToClipboard(comment, buttonEl) {
-    // Chrome's navigator.clipboard.write() does not implement multiple
-    // ClipboardItems in one call ("Support for multiple ClipboardItems is
-    // not implemented" - confirmed directly, not assumed), so text and
-    // image can't be offered as two independent clipboard entries the way
-    // Word/Docs handle mixed copies. Everything has to live in ONE item as
-    // alternative representations, and a paste target picks exactly one of
-    // them - which is also the real explanation for ChatGPT showing raw
-    // base64 text: it read text/plain rather than rendering the <img> in
-    // text/html. Offering image/png directly, rather than only buried
-    // inside an <img> tag, at least gives an image-preferring target
-    // something to pick that isn't a wall of base64.
-    const html = `${comment.text ? `<p>${escapeHtml(comment.text)}</p>` : ""}${comment.screenshots
-      .map((shot) => `<img src="${shot}" alt="Screenshot" />`)
-      .join("")}`;
-    const plain = `${comment.text || ""}${comment.screenshots
-      .map((shot) => `\n\n![Screenshot](${shot})`)
-      .join("")}`.trim();
+    const html = `${comment.text ? `<p>${escapeHtml(comment.text)}</p>` : ""}${
+      comment.screenshot ? `<img src="${comment.screenshot}" alt="Screenshot" />` : ""
+    }`;
+    const plain = `${comment.text || ""}${
+      comment.screenshot ? `\n\n![Screenshot](${comment.screenshot})` : ""
+    }`.trim();
 
     const representations = {
       "text/html": new Blob([html], { type: "text/html" }),
       "text/plain": new Blob([plain], { type: "text/plain" }),
     };
-    // image/png can only ever carry one representation - the platform
-    // limitation from the earlier thread, not new here. First shot only;
-    // the rest still travel in the html/plain fallbacks above.
-    //
-    // Also confirmed directly: Chrome's clipboard.write() rejects
-    // image/jpeg outright ("Type image/jpeg not supported on write"),
-    // regardless of what format the stored screenshot uses. Re-encode to
-    // PNG here, on the way out to the clipboard only - the smaller JPEG
-    // stays what's actually stored and downloaded.
-    if (comment.screenshots.length) {
-      const img = await loadImage(comment.screenshots[0]);
+    // Chrome's clipboard.write() rejects image/jpeg outright ("Type
+    // image/jpeg not supported on write" - confirmed directly), regardless
+    // of what format is actually stored. Re-encode to PNG here, on the way
+    // out to the clipboard only - the smaller JPEG stays what's stored and
+    // downloaded.
+    if (comment.screenshot) {
+      const img = await loadImage(comment.screenshot);
       const canvas = document.createElement("canvas");
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
@@ -168,6 +201,57 @@
     }
   }
 
+  function deleteComment(id) {
+    const key = currentPageKey();
+    const list = session?.pages[key];
+    if (!list) return;
+    const index = list.findIndex((c) => c.id === id);
+    if (index !== -1) list.splice(index, 1);
+    if (activeCommentId === id) activeCommentId = null;
+    saveSession();
+    render();
+  }
+
+  async function handleCapture(comment) {
+    captureError = null;
+    try {
+      const rect = await selectRegion();
+      if (rect) {
+        const result = await captureAndCrop(rect);
+        if (result.error) captureError = result.error;
+        else comment.screenshot = result.dataUrl;
+      }
+    } catch (err) {
+      // Whatever broke, the panel must still re-render with the reason
+      // visible - a swallowed exception here is indistinguishable from
+      // the button doing nothing at all.
+      console.error("Alan Review Tool: screenshot capture failed.", err);
+      captureError = String(err);
+    }
+    saveSession();
+    render();
+  }
+
+  function handleNewComment() {
+    if (!session) session = { startedAt: Date.now(), pages: {} };
+    const key = currentPageKey();
+    if (!session.pages[key]) session.pages[key] = [];
+    const comment = { id: Date.now(), text: "", screenshot: null };
+    // Newest first - the previously-active comment (if any) automatically
+    // becomes "just another entry" in the read-only list below once this
+    // one takes over as active, with no separate reordering step needed.
+    session.pages[key].unshift(comment);
+    activeCommentId = comment.id;
+    captureError = null;
+    saveSession();
+    render();
+  }
+
+  // Delegated and attached once, here, rather than in wireEvents(): render()
+  // replaces panelRoot's entire innerHTML on every state change, which
+  // would tear down and re-add a direct listener each time. shadow itself
+  // never gets replaced, so a listener on it survives every render - the
+  // same reasoning covers "input" below for live text edits.
   shadow.addEventListener("click", (event) => {
     const thumb = event.target.closest(".thumb");
     if (thumb) {
@@ -177,65 +261,69 @@
 
     const copyBtn = event.target.closest(".copy-btn");
     if (copyBtn) {
-      const comment = comments.find((c) => String(c.id) === copyBtn.dataset.id);
+      const comment = getPageComments().find((c) => String(c.id) === copyBtn.dataset.id);
       if (comment) copyCommentToClipboard(comment, copyBtn);
       return;
     }
 
-    const removeBtn = event.target.closest(".remove-shot");
-    if (removeBtn) {
-      const draftText = shadow.getElementById("comment-text")?.value ?? "";
-      pendingScreenshots.splice(Number(removeBtn.dataset.index), 1);
-      render();
-      const textEl = shadow.getElementById("comment-text");
-      if (textEl) textEl.value = draftText;
+    const deleteBtn = event.target.closest(".delete-active, .delete-comment");
+    if (deleteBtn) {
+      deleteComment(Number(deleteBtn.dataset.id));
+      return;
+    }
+
+    const captureIconBtn = event.target.closest(".capture-btn-icon");
+    if (captureIconBtn) {
+      const comment = getPageComments().find((c) => c.id === activeCommentId);
+      if (comment) handleCapture(comment);
     }
   });
 
-  // In-memory only - lost on close/navigation, same as the rest of this
-  // session's state. Persisting a review session across page loads is a
-  // separate, bigger feature (see the activeTab-vs-host-permissions thread).
-  let comments = [];
-  let composerOpen = false;
-  let pendingScreenshots = [];
-  let captureError = null;
+  shadow.addEventListener("input", (event) => {
+    const activeText = event.target.closest("#active-comment-text");
+    if (activeText) {
+      const comment = getPageComments().find((c) => c.id === activeCommentId);
+      if (comment) {
+        comment.text = activeText.value;
+        scheduleSave();
+      }
+      return;
+    }
 
-  function escapeHtml(str) {
-    const div = document.createElement("div");
-    div.textContent = str;
-    return div.innerHTML;
-  }
+    const readonlyText = event.target.closest(".readonly-text");
+    if (readonlyText) {
+      const comment = getPageComments().find((c) => String(c.id) === readonlyText.dataset.id);
+      if (comment) {
+        comment.text = readonlyText.textContent;
+        scheduleSave();
+      }
+    }
+  });
 
-  // A single self-contained file sidesteps the whole "which representation
-  // does this target pick" problem from the per-comment clipboard button -
-  // there's only one thing to hand over, and it carries everything
-  // (comments and their inline screenshots) rather than making a paste
-  // target choose between them.
-  // Markdown's one big win - inline images - turned out to be its problem
-  // too: a data URI can't be wrapped across lines without breaking it, so
-  // a real screenshot became a single ~90,000-character line, which is
-  // exactly the shape that breaks editor tooling like VS Code's preview.
-  // Back to HTML, but deliberately minimal - no <style>, no nested
-  // wrappers beyond what the structure needs - so it stays easy to parse
-  // rather than becoming the styled page the first version was.
   function buildReportHtml() {
-    const commentsHtml = comments
-      .map((comment, index) => {
-        const images = comment.screenshots.map((shot) => `<img src="${shot}">`).join("\n");
-        return `<div class="comment">
-<h2>Comment ${index + 1}</h2>
+    const pagesHtml = Object.entries(session?.pages || {})
+      .filter(([, list]) => list.length > 0)
+      .map(([pageUrl, list]) => {
+        const commentsHtml = list
+          .map(
+            (comment, index) => `<div class="comment">
+<h3>Comment ${index + 1}</h3>
 <p>${escapeHtml(comment.text).replace(/\n/g, "<br>")}</p>
-${images}
-</div>`;
+${comment.screenshot ? `<img src="${comment.screenshot}">` : ""}
+</div>`,
+          )
+          .join("\n");
+        return `<h2>${escapeHtml(pageUrl)}</h2>\n${commentsHtml}`;
       })
       .join("\n");
 
+    const totalCount = totalCommentCount();
     return `<!doctype html>
 <html>
 <body>
-<h1>Feedback for ${escapeHtml(location.hostname)}</h1>
-<p>Captured ${new Date().toLocaleString()} — ${comments.length} comment${comments.length === 1 ? "" : "s"}</p>
-${commentsHtml}
+<h1>Feedback session</h1>
+<p>Started ${session ? new Date(session.startedAt).toLocaleString() : "-"} — ${totalCount} comment${totalCount === 1 ? "" : "s"} across ${Object.keys(session?.pages || {}).length} page${Object.keys(session?.pages || {}).length === 1 ? "" : "s"}</p>
+${pagesHtml}
 </body>
 </html>
 `;
@@ -246,55 +334,45 @@ ${commentsHtml}
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `alan-review-${location.hostname}-${Date.now()}.html`;
+    a.download = `alan-review-session-${Date.now()}.html`;
     a.click();
     URL.revokeObjectURL(url);
   }
 
-  function renderComposer() {
+  function renderActiveComment(comment) {
     return `
-      <div class="composer">
-        <textarea id="comment-text" placeholder="What's the feedback?"></textarea>
-        ${
-          pendingScreenshots.length
-            ? `<div class="shot-row">${pendingScreenshots
-                .map(
-                  (shot, index) => `
-                  <span class="shot-thumb">
-                    <img class="thumb" src="${shot}" alt="Captured region" />
-                    <button class="remove-shot" type="button" data-index="${index}" title="Remove">×</button>
-                  </span>`,
-                )
-                .join("")}</div>`
-            : ""
-        }
-        ${captureError ? `<p class="capture-error">Couldn't capture a screenshot: ${escapeHtml(captureError)}</p>` : ""}
-        <div class="composer-actions">
-          <button id="capture-btn" type="button">Capture screenshot</button>
-          <button id="save-btn" type="button">Add comment</button>
-          <button id="cancel-btn" type="button">Cancel</button>
+      <div class="active-comment">
+        <textarea id="active-comment-text" placeholder="What's the feedback?">${escapeHtml(comment.text)}</textarea>
+        <div class="active-comment-controls">
+          <button class="delete-active" type="button" data-id="${comment.id}" title="Delete this comment">×</button>
+          ${
+            comment.screenshot
+              ? `<img class="thumb" src="${comment.screenshot}" alt="Captured region" />`
+              : `<button class="capture-btn-icon" type="button" title="Capture screenshot">📷</button>`
+          }
         </div>
       </div>
+      ${captureError ? `<p class="capture-error">Couldn't capture a screenshot: ${escapeHtml(captureError)}</p>` : ""}
     `;
   }
 
-  function renderCommentItem(comment) {
+  function renderReadOnlyComment(comment) {
     return `
       <div class="comment-item">
-        ${
-          comment.screenshots.length
-            ? `<div class="shot-row">${comment.screenshots
-                .map((shot) => `<img class="thumb" src="${shot}" alt="Captured region" />`)
-                .join("")}</div>`
-            : ""
-        }
-        <p>${escapeHtml(comment.text)}</p>
+        <button class="delete-comment" type="button" data-id="${comment.id}" title="Delete this comment">×</button>
+        <div class="readonly-text" data-id="${comment.id}" contenteditable="true">${escapeHtml(comment.text)}</div>
+        ${comment.screenshot ? `<img class="thumb" src="${comment.screenshot}" alt="Captured region" />` : ""}
         <button class="copy-btn" type="button" data-id="${comment.id}">Copy to clipboard</button>
       </div>
     `;
   }
 
   function render() {
+    const pageComments = getPageComments();
+    const activeComment = pageComments.find((c) => c.id === activeCommentId) || null;
+    const readOnlyComments = pageComments.filter((c) => c.id !== activeCommentId);
+    const totalCount = totalCommentCount();
+
     panelRoot.innerHTML = `
       <div class="resizer"></div>
       <div class="panel">
@@ -302,20 +380,28 @@ ${commentsHtml}
           <h2>Alan Review Tool</h2>
           <button id="close" type="button">Close</button>
         </div>
-        <p>Injected on: ${location.hostname}</p>
-        <p>Browser: ${isFirefox ? "Firefox" : "Chromium-based"}</p>
 
-        ${
-          composerOpen
-            ? renderComposer()
-            : `<div class="toolbar">
-                <button id="new-comment" type="button">+ New comment</button>
-                <button id="download-report" type="button" ${comments.length ? "" : "disabled"}>Download report</button>
-              </div>`
-        }
+        <div class="session-info">
+          <div class="session-text">
+            ${
+              session
+                ? `<p>Session started ${new Date(session.startedAt).toLocaleString()}</p>
+                   <p>${totalCount} comment${totalCount === 1 ? "" : "s"}</p>`
+                : `<p>No active session yet</p>`
+            }
+          </div>
+          <div class="session-actions">
+            <button id="clear-session" type="button" ${session ? "" : "disabled"}>Clear Session</button>
+            <button id="download-report" type="button" ${totalCount ? "" : "disabled"}>Download report</button>
+          </div>
+        </div>
+
+        <button id="new-comment" type="button">+ New comment</button>
+
+        ${activeComment ? renderActiveComment(activeComment) : ""}
 
         <div class="comments">
-          ${comments.map(renderCommentItem).join("")}
+          ${readOnlyComments.map(renderReadOnlyComment).join("")}
         </div>
       </div>
     `;
@@ -328,52 +414,17 @@ ${commentsHtml}
       restorePage();
     });
 
-    shadow.getElementById("new-comment")?.addEventListener("click", () => {
-      composerOpen = true;
-      pendingScreenshots = [];
-      captureError = null;
+    shadow.getElementById("new-comment").addEventListener("click", handleNewComment);
+
+    shadow.getElementById("clear-session")?.addEventListener("click", () => {
+      if (!confirm("Clear the current session? This removes every comment across every page.")) return;
+      session = null;
+      activeCommentId = null;
+      saveSession();
       render();
     });
 
     shadow.getElementById("download-report")?.addEventListener("click", downloadReport);
-
-    shadow.getElementById("cancel-btn")?.addEventListener("click", () => {
-      composerOpen = false;
-      pendingScreenshots = [];
-      captureError = null;
-      render();
-    });
-
-    shadow.getElementById("save-btn")?.addEventListener("click", () => {
-      const text = shadow.getElementById("comment-text")?.value.trim() || "";
-      if (!text && pendingScreenshots.length === 0) return;
-      comments.push({ id: Date.now(), text, screenshots: [...pendingScreenshots] });
-      composerOpen = false;
-      pendingScreenshots = [];
-      render();
-    });
-
-    shadow.getElementById("capture-btn")?.addEventListener("click", async () => {
-      const draftText = shadow.getElementById("comment-text")?.value ?? "";
-      captureError = null;
-      try {
-        const rect = await selectRegion();
-        if (rect) {
-          const result = await captureAndCrop(rect);
-          if (result.error) captureError = result.error;
-          else pendingScreenshots.push(result.dataUrl);
-        }
-      } catch (err) {
-        // Whatever broke, the composer must still re-render with the
-        // reason visible - a swallowed exception here is indistinguishable
-        // from the button doing nothing at all.
-        console.error("Alan Review Tool: screenshot capture failed.", err);
-        captureError = String(err);
-      }
-      render();
-      const textEl = shadow.getElementById("comment-text");
-      if (textEl) textEl.value = draftText;
-    });
 
     const resizer = shadow.querySelector(".resizer");
     resizer.addEventListener("mousedown", (mouseDownEvent) => {
@@ -548,9 +599,8 @@ ${commentsHtml}
     );
     // JPEG rather than PNG - a UI screenshot has enough photographic-ish
     // gradients (shadows, anti-aliased text) that lossy compression saves
-    // real space, and the base64 bloat was the whole complaint that sent
-    // us back from Markdown. 0.85 keeps text legible; PNG's lossless
-    // fidelity was never load-bearing for a review screenshot.
+    // real space. 0.85 keeps text legible; PNG's lossless fidelity was
+    // never load-bearing for a review screenshot.
     return { dataUrl: canvas.toDataURL("image/jpeg", 0.85) };
   }
 

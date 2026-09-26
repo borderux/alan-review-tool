@@ -37,40 +37,75 @@ h2 {
 p {
   font-size: 13px;
   opacity: 0.8;
+  margin: 0 0 4px;
 }
 button {
   padding: 6px 12px;
   cursor: pointer;
 }
-.toolbar {
-  margin-top: 12px;
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
 button:disabled {
   opacity: 0.5;
   cursor: default;
 }
-.composer {
-  margin-top: 12px;
+
+.session-info {
+  margin-top: 8px;
+  padding: 8px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 8px;
 }
-.composer textarea {
+.session-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+#new-comment {
+  margin-top: 12px;
   width: 100%;
-  min-height: 60px;
+}
+
+.active-comment {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.active-comment textarea {
+  flex: 1;
+  min-height: 70px;
   box-sizing: border-box;
   font-family: inherit;
   font-size: 13px;
   padding: 6px;
 }
-.composer-actions {
+.active-comment-controls {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
 }
+.delete-active,
+.delete-comment {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  line-height: 1;
+  border-radius: 50%;
+  background: #d33;
+  color: #fff;
+  border: none;
+}
+.capture-btn-icon {
+  font-size: 16px;
+  padding: 4px 8px;
+}
+
 .thumb {
   display: block;
   max-width: 100px;
@@ -79,32 +114,11 @@ button:disabled {
   border: 1px solid rgba(255, 255, 255, 0.2);
   cursor: zoom-in;
 }
-.shot-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.shot-thumb {
-  position: relative;
-  display: inline-block;
-}
-.remove-shot {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  line-height: 1;
-  border-radius: 50%;
-  background: #d33;
-  color: #fff;
-  border: none;
-}
 .capture-error {
   color: #ff8080;
   opacity: 1;
 }
+
 .comments {
   margin-top: 16px;
   display: flex;
@@ -112,11 +126,29 @@ button:disabled {
   gap: 12px;
 }
 .comment-item {
+  position: relative;
   background: rgba(255, 255, 255, 0.06);
   border-radius: 6px;
   padding: 8px;
 }
-.comment-item p {
-  margin: 6px 0 0;
+.comment-item .delete-comment {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+}
+.readonly-text {
+  font-size: 13px;
   opacity: 1;
+  white-space: pre-wrap;
+  min-height: 1.4em;
+  padding: 2px;
+  border-radius: 3px;
+}
+.readonly-text:hover,
+.readonly-text:focus {
+  background: rgba(255, 255, 255, 0.08);
+  outline: none;
+}
+.comment-item .copy-btn {
+  margin-top: 6px;
 }
