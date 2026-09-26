@@ -74,15 +74,13 @@ button:disabled {
   flex: 1;
 }
 
-/* Active and read-only comments share one visual treatment - a card with
-   a lighter-grey border so it's visible against the panel's own subtle
-   background tint, and the same upper-right delete X in both. They only
-   differ in what's editable and how (live textarea vs. contenteditable).
-   padding-bottom reserves an empty strip below the text content (which
-   only occupies the box's normal content area, above that reserved
-   padding) for the 50x50 thumb/camera slot - positioned within that
-   padding via bottom/right, so it never overlaps the text itself. */
-.active-comment,
+/* Every comment - newest or not - shares one card: a lighter-grey border
+   so it's visible against the panel's own subtle background tint, the
+   same upper-right delete X, and a 50x50 lower-right slot for the
+   thumbnail or camera button. padding-bottom reserves an empty strip
+   below the text content (which only occupies the box's normal content
+   area, above that reserved padding) for that slot, so it never overlaps
+   the text itself. */
 .comment-item {
   position: relative;
   background: rgba(255, 255, 255, 0.06);
@@ -92,14 +90,9 @@ button:disabled {
 }
 /* The only focus indicator, per feedback: no separate hover/focus
    background highlight on the text itself, just a lighter card border. */
-.active-comment:focus-within,
 .comment-item:focus-within {
   border-color: rgba(255, 255, 255, 0.5);
 }
-.active-comment {
-  margin-top: 12px;
-}
-.delete-active,
 .delete-comment {
   position: absolute;
   top: -6px;
@@ -112,20 +105,6 @@ button:disabled {
   background: #d33;
   color: #fff;
   border: none;
-}
-.active-comment textarea {
-  display: block;
-  width: 100%;
-  min-height: 60px;
-  box-sizing: border-box;
-  font-family: inherit;
-  font-size: 13px;
-  padding: 6px;
-  resize: none;
-  overflow: hidden;
-}
-.active-comment textarea:focus {
-  outline: none;
 }
 
 .thumb,
@@ -144,14 +123,21 @@ button:disabled {
   border: 1px solid rgba(255, 255, 255, 0.2);
   cursor: zoom-in;
 }
+/* Camera button only shows while its own comment has focus - a comment
+   not being edited has no business offering to attach a screenshot to
+   it right now. Pure CSS rather than JS-tracked focus state, so it can't
+   go stale or require a re-render (which would drop focus) to update. */
 .capture-btn-icon {
-  display: inline-flex;
+  display: none;
   align-items: center;
   justify-content: center;
   background: none;
   border: 1px solid #999;
   border-radius: 4px;
   padding: 0;
+}
+.comment-item:focus-within .capture-btn-icon {
+  display: inline-flex;
 }
 .capture-error {
   color: #ff8080;
@@ -164,7 +150,7 @@ button:disabled {
   flex-direction: column;
   gap: 12px;
 }
-.readonly-text {
+.comment-text {
   font-size: 13px;
   opacity: 1;
   white-space: pre-wrap;
@@ -172,6 +158,6 @@ button:disabled {
   padding: 2px;
   border-radius: 3px;
 }
-.readonly-text:focus {
+.comment-text:focus {
   outline: none;
 }

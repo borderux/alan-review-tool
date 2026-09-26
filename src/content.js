@@ -38,12 +38,16 @@
   // different site at all. chrome.storage.local is shared across every
   // page this extension runs on, regardless of origin.
   let session = stored[SESSION_STORAGE_KEY] || null;
-  // Which comment (if any) shows as the live textarea "stack top" rather
-  // than a read-only entry. Always starts null on a fresh injection - only
-  // clicking "+ New comment" activates one, even if this page already has
-  // comments from a previous visit.
-  let activeCommentId = null;
+  // Every comment renders the same way (contenteditable text, camera
+  // button only while it itself has focus and no screenshot yet) - there's
+  // no separate "active" comment concept or state to track, since
+  // ordering already comes from unshift and focus is just DOM focus.
   let captureError = null;
+  // Which comment a capture error belongs to - null means the general
+  // "New screenshot" flow (no comment exists yet to attach the message
+  // to), otherwise a specific comment's id, so the message renders inside
+  // that comment's own card instead.
+  let captureErrorCommentId = null;
 
   function currentPageKey() {
     return location.origin + location.pathname + location.search;
@@ -158,13 +162,31 @@
     if (!list) return;
     const index = list.findIndex((c) => c.id === id);
     if (index !== -1) list.splice(index, 1);
-    if (activeCommentId === id) activeCommentId = null;
     saveSession();
     render();
   }
 
+  function focusAtEnd(el) {
+    el.focus();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  // A render() rebuilds every comment's markup from scratch, so a comment
+  // created a moment ago has to be re-found by id afterward rather than
+  // held onto as a DOM reference.
+  function focusCommentById(id) {
+    const el = shadow.querySelector(`.comment-text[data-id="${id}"]`);
+    if (el) focusAtEnd(el);
+  }
+
   async function handleCapture(comment) {
     captureError = null;
+    captureErrorCommentId = comment.id;
     try {
       const rect = await selectRegion();
       if (rect) {
@@ -181,6 +203,7 @@
     }
     saveSession();
     render();
+    if (!captureError) focusCommentById(comment.id);
   }
 
   function handleNewComment() {
@@ -188,14 +211,14 @@
     const key = currentPageKey();
     if (!session.pages[key]) session.pages[key] = [];
     const comment = { id: Date.now(), text: "", screenshot: null };
-    // Newest first - the previously-active comment (if any) automatically
-    // becomes "just another entry" in the read-only list below once this
-    // one takes over as active, with no separate reordering step needed.
+    // Newest first - every comment renders the same way regardless of
+    // position, so nothing else needs to change about the rest of the list.
     session.pages[key].unshift(comment);
-    activeCommentId = comment.id;
     captureError = null;
+    captureErrorCommentId = null;
     saveSession();
     render();
+    focusCommentById(comment.id);
   }
 
   // Captures first, then creates the comment - if the user cancels the
@@ -203,6 +226,7 @@
   // all, since the entire point of this button is the screenshot itself.
   async function handleNewScreenshot() {
     captureError = null;
+    captureErrorCommentId = null;
     try {
       const rect = await selectRegion();
       if (!rect) return;
@@ -217,24 +241,14 @@
       if (!session.pages[key]) session.pages[key] = [];
       const comment = { id: Date.now(), text: "", screenshot: result.dataUrl };
       session.pages[key].unshift(comment);
-      activeCommentId = comment.id;
       saveSession();
       render();
+      focusCommentById(comment.id);
     } catch (err) {
       console.error("Alan Review Tool: screenshot capture failed.", err);
       captureError = String(err);
       render();
     }
-  }
-
-  function focusAtEnd(el) {
-    el.focus();
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    range.collapse(false);
-    const selection = window.getSelection();
-    selection.removeAllRanges();
-    selection.addRange(range);
   }
 
   // Copy is left alone (it already works natively) - only paste is
@@ -246,10 +260,11 @@
     const key = currentPageKey();
     const duplicate = { id: Date.now(), text: source.text, screenshot: source.screenshot };
     session.pages[key].unshift(duplicate);
-    activeCommentId = duplicate.id;
     captureError = null;
+    captureErrorCommentId = null;
     saveSession();
     render();
+    focusCommentById(duplicate.id);
   }
 
   // Delegated and attached once, here, rather than in wireEvents(): render()
@@ -264,23 +279,6 @@
       return;
     }
 
-    // The active comment's X clears its draft in place rather than
-    // deleting it - the slot stays active and ready for input again. A
-    // read-only comment's X is a real delete, since there's no "draft" to
-    // go back to once it's no longer the one being actively edited.
-    const clearActiveBtn = event.target.closest(".delete-active");
-    if (clearActiveBtn) {
-      const comment = getPageComments().find((c) => c.id === activeCommentId);
-      if (comment) {
-        comment.text = "";
-        comment.screenshot = null;
-        captureError = null;
-        saveSession();
-        render();
-      }
-      return;
-    }
-
     const deleteBtn = event.target.closest(".delete-comment");
     if (deleteBtn) {
       deleteComment(Number(deleteBtn.dataset.id));
@@ -289,55 +287,37 @@
 
     const captureIconBtn = event.target.closest(".capture-btn-icon");
     if (captureIconBtn) {
-      const comment = getPageComments().find((c) => c.id === activeCommentId);
+      const comment = getPageComments().find((c) => String(c.id) === captureIconBtn.dataset.id);
       if (comment) handleCapture(comment);
       return;
     }
 
-    // Clicking anywhere in a read-only comment's card - not just precisely
-    // on its text - focuses it with the cursor at the end, so continuing
-    // to add to an existing comment doesn't require a precise click.
-    const readonlyCard = event.target.closest(".comment-item");
-    if (readonlyCard) {
-      const textEl = readonlyCard.querySelector(".readonly-text");
+    // Clicking anywhere in a comment's card - not just precisely on its
+    // text - focuses it with the cursor at the end, so continuing to add
+    // to an existing comment doesn't require a precise click.
+    const card = event.target.closest(".comment-item");
+    if (card) {
+      const textEl = card.querySelector(".comment-text");
       if (textEl) focusAtEnd(textEl);
     }
   });
 
   shadow.addEventListener("paste", (event) => {
-    const target = event.target.closest("#active-comment-text, .readonly-text");
+    const target = event.target.closest(".comment-text");
     if (!target) return;
     event.preventDefault();
 
-    const sourceId = target.id === "active-comment-text" ? activeCommentId : Number(target.dataset.id);
-    const source = getPageComments().find((c) => c.id === sourceId);
+    const source = getPageComments().find((c) => String(c.id) === target.dataset.id);
     duplicateComment(source);
   });
 
-  function autoGrowTextarea(el) {
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }
-
   shadow.addEventListener("input", (event) => {
-    const activeText = event.target.closest("#active-comment-text");
-    if (activeText) {
-      const comment = getPageComments().find((c) => c.id === activeCommentId);
-      if (comment) {
-        comment.text = activeText.value;
-        scheduleSave();
-      }
-      autoGrowTextarea(activeText);
-      return;
-    }
-
-    const readonlyText = event.target.closest(".readonly-text");
-    if (readonlyText) {
-      const comment = getPageComments().find((c) => String(c.id) === readonlyText.dataset.id);
-      if (comment) {
-        comment.text = readonlyText.textContent;
-        scheduleSave();
-      }
+    const textEl = event.target.closest(".comment-text");
+    if (!textEl) return;
+    const comment = getPageComments().find((c) => String(c.id) === textEl.dataset.id);
+    if (comment) {
+      comment.text = textEl.textContent;
+      scheduleSave();
     }
   });
 
@@ -380,35 +360,32 @@ ${pagesHtml}
     URL.revokeObjectURL(url);
   }
 
-  function renderActiveComment(comment) {
-    return `
-      <div class="active-comment">
-        <button class="delete-active" type="button" data-id="${comment.id}" title="Clear this comment">×</button>
-        <textarea id="active-comment-text" placeholder="What's the feedback?">${escapeHtml(comment.text)}</textarea>
-        ${
-          comment.screenshot
-            ? `<img class="thumb" src="${comment.screenshot}" alt="Captured region" />`
-            : `<button class="capture-btn-icon" type="button" title="Capture screenshot">${CAMERA_SVG}</button>`
-        }
-      </div>
-      ${captureError ? `<p class="capture-error">Couldn't capture a screenshot: ${escapeHtml(captureError)}</p>` : ""}
-    `;
-  }
-
-  function renderReadOnlyComment(comment) {
+  // Every comment - newest or not - renders identically: a card with the
+  // same upper-right delete X, click-anywhere-to-edit text, and a
+  // lower-right camera/thumbnail slot. There's no longer a distinct
+  // "active" comment component; which one shows its camera button is
+  // driven entirely by :focus-within in content.css, not by JS state.
+  function renderComment(comment) {
     return `
       <div class="comment-item">
         <button class="delete-comment" type="button" data-id="${comment.id}" title="Delete this comment">×</button>
-        <div class="readonly-text" data-id="${comment.id}" contenteditable="true">${escapeHtml(comment.text)}</div>
-        ${comment.screenshot ? `<img class="thumb" src="${comment.screenshot}" alt="Captured region" />` : ""}
+        <div class="comment-text" data-id="${comment.id}" contenteditable="true">${escapeHtml(comment.text)}</div>
+        ${
+          comment.screenshot
+            ? `<img class="thumb" src="${comment.screenshot}" alt="Captured region" />`
+            : `<button class="capture-btn-icon" type="button" data-id="${comment.id}" title="Capture screenshot">${CAMERA_SVG}</button>`
+        }
+        ${
+          captureError && captureErrorCommentId === comment.id
+            ? `<p class="capture-error">Couldn't capture a screenshot: ${escapeHtml(captureError)}</p>`
+            : ""
+        }
       </div>
     `;
   }
 
   function render() {
     const pageComments = getPageComments();
-    const activeComment = pageComments.find((c) => c.id === activeCommentId) || null;
-    const readOnlyComments = pageComments.filter((c) => c.id !== activeCommentId);
     const totalCount = totalCommentCount();
 
     panelRoot.innerHTML = `
@@ -439,23 +416,18 @@ ${pagesHtml}
           <button id="new-screenshot" type="button">+ New screenshot</button>
         </div>
 
-        ${!activeComment && captureError ? `<p class="capture-error">Couldn't capture a screenshot: ${escapeHtml(captureError)}</p>` : ""}
-
-        ${activeComment ? renderActiveComment(activeComment) : ""}
+        ${
+          captureError && captureErrorCommentId === null
+            ? `<p class="capture-error">Couldn't capture a screenshot: ${escapeHtml(captureError)}</p>`
+            : ""
+        }
 
         <div class="comments">
-          ${readOnlyComments.map(renderReadOnlyComment).join("")}
+          ${pageComments.map(renderComment).join("")}
         </div>
       </div>
     `;
     wireEvents();
-
-    // Sized here too, not just on input: a render() can rebuild the
-    // textarea around existing multi-line content (e.g. right after a
-    // screenshot capture forces a re-render), and it should already be
-    // grown to fit that content rather than waiting for the next keystroke.
-    const textEl = shadow.getElementById("active-comment-text");
-    if (textEl) autoGrowTextarea(textEl);
   }
 
   function wireEvents() {
@@ -470,7 +442,6 @@ ${pagesHtml}
     shadow.getElementById("clear-session")?.addEventListener("click", () => {
       if (!confirm("Clear the current session? This removes every comment across every page.")) return;
       session = null;
-      activeCommentId = null;
       saveSession();
       render();
     });
