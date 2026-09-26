@@ -110,19 +110,22 @@
     // text/html. Offering image/png directly, rather than only buried
     // inside an <img> tag, at least gives an image-preferring target
     // something to pick that isn't a wall of base64.
-    const html = `${comment.text ? `<p>${escapeHtml(comment.text)}</p>` : ""}${
-      comment.screenshot ? `<img src="${comment.screenshot}" alt="Screenshot" />` : ""
-    }`;
-    const plain = `${comment.text || ""}${
-      comment.screenshot ? `\n\n![Screenshot](${comment.screenshot})` : ""
-    }`.trim();
+    const html = `${comment.text ? `<p>${escapeHtml(comment.text)}</p>` : ""}${comment.screenshots
+      .map((shot) => `<img src="${shot}" alt="Screenshot" />`)
+      .join("")}`;
+    const plain = `${comment.text || ""}${comment.screenshots
+      .map((shot) => `\n\n![Screenshot](${shot})`)
+      .join("")}`.trim();
 
     const representations = {
       "text/html": new Blob([html], { type: "text/html" }),
       "text/plain": new Blob([plain], { type: "text/plain" }),
     };
-    if (comment.screenshot) {
-      representations["image/png"] = await (await fetch(comment.screenshot)).blob();
+    // image/png can only ever carry one representation - the platform
+    // limitation from the earlier thread, not new here. First shot only;
+    // the rest still travel in the html/plain fallbacks above.
+    if (comment.screenshots.length) {
+      representations["image/png"] = await (await fetch(comment.screenshots[0])).blob();
     }
 
     try {
@@ -145,6 +148,16 @@
     if (copyBtn) {
       const comment = comments.find((c) => String(c.id) === copyBtn.dataset.id);
       if (comment) copyCommentToClipboard(comment, copyBtn);
+      return;
+    }
+
+    const removeBtn = event.target.closest(".remove-shot");
+    if (removeBtn) {
+      const draftText = shadow.getElementById("comment-text")?.value ?? "";
+      pendingScreenshots.splice(Number(removeBtn.dataset.index), 1);
+      render();
+      const textEl = shadow.getElementById("comment-text");
+      if (textEl) textEl.value = draftText;
     }
   });
 
@@ -153,7 +166,7 @@
   // separate, bigger feature (see the activeTab-vs-host-permissions thread).
   let comments = [];
   let composerOpen = false;
-  let pendingScreenshot = null;
+  let pendingScreenshots = [];
   let captureError = null;
 
   function escapeHtml(str) {
@@ -167,45 +180,37 @@
   // there's only one thing to hand over, and it carries everything
   // (comments and their inline screenshots) rather than making a paste
   // target choose between them.
-  function buildReportHtml() {
-    const commentsHtml = comments
-      .map(
-        (comment) => `
-      <div class="comment">
-        <p>${escapeHtml(comment.text).replace(/\n/g, "<br>")}</p>
-        ${comment.screenshot ? `<img src="${comment.screenshot}" alt="Screenshot" />` : ""}
-      </div>`,
-      )
-      .join("\n");
+  // Neutralizes raw HTML in a comment (a literal "<script>" typed by a
+  // reviewer, or copied off the page under review) without escaping
+  // ordinary markdown syntax - most markdown renderers pass raw HTML
+  // through unchanged, which is the same risk the HTML report already
+  // guarded against, just via CommonMark's own rules instead of the DOM's.
+  function escapeAngleBrackets(str) {
+    return str.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
 
-    return `<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Alan Review Tool — ${escapeHtml(location.hostname)}</title>
-<style>
-  body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 16px; color: #1e1e2e; }
-  h1 { font-size: 20px; }
-  .meta { color: #666; font-size: 13px; margin-bottom: 24px; }
-  .comment { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-  .comment img { max-width: 100%; border-radius: 4px; margin-top: 8px; }
-</style>
-</head>
-<body>
-  <h1>Feedback for ${escapeHtml(location.hostname)}</h1>
-  <p class="meta">Captured ${new Date().toLocaleString()} — ${comments.length} comment${comments.length === 1 ? "" : "s"}</p>
-  ${commentsHtml}
-</body>
-</html>
+  function buildReportMarkdown() {
+    const commentsMd = comments
+      .map((comment, index) => {
+        const images = comment.screenshots.map((shot) => `\n\n![Screenshot](${shot})`).join("");
+        return `## Comment ${index + 1}\n\n${escapeAngleBrackets(comment.text)}${images}`;
+      })
+      .join("\n\n");
+
+    return `# Feedback for ${location.hostname}
+
+_Captured ${new Date().toLocaleString()} — ${comments.length} comment${comments.length === 1 ? "" : "s"}_
+
+${commentsMd}
 `;
   }
 
   function downloadReport() {
-    const blob = new Blob([buildReportHtml()], { type: "text/html" });
+    const blob = new Blob([buildReportMarkdown()], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `alan-review-${location.hostname}-${Date.now()}.html`;
+    a.download = `alan-review-${location.hostname}-${Date.now()}.md`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -214,7 +219,19 @@
     return `
       <div class="composer">
         <textarea id="comment-text" placeholder="What's the feedback?"></textarea>
-        ${pendingScreenshot ? `<img class="thumb" src="${pendingScreenshot}" alt="Captured region" />` : ""}
+        ${
+          pendingScreenshots.length
+            ? `<div class="shot-row">${pendingScreenshots
+                .map(
+                  (shot, index) => `
+                  <span class="shot-thumb">
+                    <img class="thumb" src="${shot}" alt="Captured region" />
+                    <button class="remove-shot" type="button" data-index="${index}" title="Remove">×</button>
+                  </span>`,
+                )
+                .join("")}</div>`
+            : ""
+        }
         ${captureError ? `<p class="capture-error">Couldn't capture a screenshot: ${escapeHtml(captureError)}</p>` : ""}
         <div class="composer-actions">
           <button id="capture-btn" type="button">Capture screenshot</button>
@@ -228,7 +245,13 @@
   function renderCommentItem(comment) {
     return `
       <div class="comment-item">
-        ${comment.screenshot ? `<img class="thumb" src="${comment.screenshot}" alt="Captured region" />` : ""}
+        ${
+          comment.screenshots.length
+            ? `<div class="shot-row">${comment.screenshots
+                .map((shot) => `<img class="thumb" src="${shot}" alt="Captured region" />`)
+                .join("")}</div>`
+            : ""
+        }
         <p>${escapeHtml(comment.text)}</p>
         <button class="copy-btn" type="button" data-id="${comment.id}">Copy to clipboard</button>
       </div>
@@ -310,6 +333,28 @@
           border: 1px solid rgba(255, 255, 255, 0.2);
           cursor: zoom-in;
         }
+        .shot-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .shot-thumb {
+          position: relative;
+          display: inline-block;
+        }
+        .remove-shot {
+          position: absolute;
+          top: -6px;
+          right: -6px;
+          width: 18px;
+          height: 18px;
+          padding: 0;
+          line-height: 1;
+          border-radius: 50%;
+          background: #d33;
+          color: #fff;
+          border: none;
+        }
         .capture-error {
           color: #ff8080;
           opacity: 1;
@@ -361,7 +406,7 @@
 
     shadow.getElementById("new-comment")?.addEventListener("click", () => {
       composerOpen = true;
-      pendingScreenshot = null;
+      pendingScreenshots = [];
       captureError = null;
       render();
     });
@@ -370,17 +415,17 @@
 
     shadow.getElementById("cancel-btn")?.addEventListener("click", () => {
       composerOpen = false;
-      pendingScreenshot = null;
+      pendingScreenshots = [];
       captureError = null;
       render();
     });
 
     shadow.getElementById("save-btn")?.addEventListener("click", () => {
       const text = shadow.getElementById("comment-text")?.value.trim() || "";
-      if (!text && !pendingScreenshot) return;
-      comments.push({ id: Date.now(), text, screenshot: pendingScreenshot });
+      if (!text && pendingScreenshots.length === 0) return;
+      comments.push({ id: Date.now(), text, screenshots: [...pendingScreenshots] });
       composerOpen = false;
-      pendingScreenshot = null;
+      pendingScreenshots = [];
       render();
     });
 
@@ -392,7 +437,7 @@
         if (rect) {
           const result = await captureAndCrop(rect);
           if (result.error) captureError = result.error;
-          else pendingScreenshot = result.dataUrl;
+          else pendingScreenshots.push(result.dataUrl);
         }
       } catch (err) {
         // Whatever broke, the composer must still re-render with the
