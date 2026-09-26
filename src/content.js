@@ -240,6 +240,11 @@
     }
   });
 
+  function autoGrowTextarea(el) {
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }
+
   shadow.addEventListener("input", (event) => {
     const activeText = event.target.closest("#active-comment-text");
     if (activeText) {
@@ -248,6 +253,7 @@
         comment.text = activeText.value;
         scheduleSave();
       }
+      autoGrowTextarea(activeText);
       return;
     }
 
@@ -364,6 +370,13 @@ ${pagesHtml}
       </div>
     `;
     wireEvents();
+
+    // Sized here too, not just on input: a render() can rebuild the
+    // textarea around existing multi-line content (e.g. right after a
+    // screenshot capture forces a re-render), and it should already be
+    // grown to fit that content rather than waiting for the next keystroke.
+    const textEl = shadow.getElementById("active-comment-text");
+    if (textEl) autoGrowTextarea(textEl);
   }
 
   function wireEvents() {

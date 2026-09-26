@@ -73,14 +73,24 @@ button:disabled {
 /* Active and read-only comments share one visual treatment - a card with
    a lighter-grey border so it's visible against the panel's own subtle
    background tint, and the same upper-right delete X in both. They only
-   differ in what's editable and how (live textarea vs. contenteditable). */
+   differ in what's editable and how (live textarea vs. contenteditable).
+   padding-bottom reserves an empty strip below the text content (which
+   only occupies the box's normal content area, above that reserved
+   padding) for the 50x50 thumb/camera slot - positioned within that
+   padding via bottom/right, so it never overlaps the text itself. */
 .active-comment,
 .comment-item {
   position: relative;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 4px;
-  padding: 8px;
+  padding: 8px 8px 60px;
+}
+/* The only focus indicator, per feedback: no separate hover/focus
+   background highlight on the text itself, just a lighter card border. */
+.active-comment:focus-within,
+.comment-item:focus-within {
+  border-color: rgba(255, 255, 255, 0.5);
 }
 .active-comment {
   margin-top: 12px;
@@ -102,28 +112,42 @@ button:disabled {
 .active-comment textarea {
   display: block;
   width: 100%;
-  min-height: 70px;
+  min-height: 60px;
   box-sizing: border-box;
   font-family: inherit;
   font-size: 13px;
   padding: 6px;
+  resize: none;
+  overflow: hidden;
 }
-.capture-btn-icon {
-  display: inline-flex;
-  margin-top: 6px;
-  background: none;
-  border: none;
-  padding: 4px;
+.active-comment textarea:focus {
+  outline: none;
 }
 
+.thumb,
+.capture-btn-icon {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 50px;
+  height: 50px;
+  box-sizing: border-box;
+}
 .thumb {
   display: block;
-  margin-top: 6px;
-  max-width: 100px;
-  max-height: 100px;
+  object-fit: cover;
   border-radius: 4px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   cursor: zoom-in;
+}
+.capture-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  padding: 0;
 }
 .capture-error {
   color: #ff8080;
@@ -144,8 +168,6 @@ button:disabled {
   padding: 2px;
   border-radius: 3px;
 }
-.readonly-text:hover,
 .readonly-text:focus {
-  background: rgba(255, 255, 255, 0.08);
   outline: none;
 }
