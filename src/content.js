@@ -13,6 +13,10 @@
   const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
   const CAMERA_SVG = `<svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>`;
+  // Replaced by build.js with the real contents of src/report.css - kept
+  // as its own source file rather than a hand-maintained string here, so
+  // report styling can be edited (and linted) like any other stylesheet.
+  const REPORT_CSS = "__REPORT_CSS_PLACEHOLDER__";
 
   function restorePage() {
     html.style.width = html.dataset.alanReviewToolPrevWidth || "";
@@ -61,14 +65,24 @@
     return location.origin + location.pathname + location.search;
   }
 
+  // Each page entry carries its own title (captured once, the first time
+  // a comment touches that page) alongside its comments - the report
+  // needs a real page title, not just the URL the page is already keyed
+  // by, and document.title can change later (SPA navigation, tab title
+  // updates) so it has to be captured at the moment it's still accurate.
+  function ensurePageEntry(key) {
+    if (!session.pages[key]) session.pages[key] = { title: document.title, comments: [] };
+    return session.pages[key];
+  }
+
   function getPageComments() {
     if (!session) return [];
-    return session.pages[currentPageKey()] || [];
+    return session.pages[currentPageKey()]?.comments || [];
   }
 
   function totalCommentCount() {
     if (!session) return 0;
-    return Object.values(session.pages).reduce((sum, list) => sum + list.length, 0);
+    return Object.values(session.pages).reduce((sum, page) => sum + page.comments.length, 0);
   }
 
   function saveSession() {
@@ -323,7 +337,7 @@
 
   function deleteComment(id) {
     const key = currentPageKey();
-    const list = session?.pages[key];
+    const list = session?.pages[key]?.comments;
     if (!list) return;
     const index = list.findIndex((c) => c.id === id);
     if (index !== -1) list.splice(index, 1);
@@ -383,11 +397,10 @@
   function handleNewComment() {
     ensureSession();
     const key = currentPageKey();
-    if (!session.pages[key]) session.pages[key] = [];
     const comment = { id: Date.now(), text: "", screenshot: null };
     // Newest first - every comment renders the same way regardless of
     // position, so nothing else needs to change about the rest of the list.
-    session.pages[key].unshift(comment);
+    ensurePageEntry(key).comments.unshift(comment);
     captureError = null;
     captureErrorCommentId = null;
     saveSession();
@@ -412,9 +425,8 @@
       }
       ensureSession();
       const key = currentPageKey();
-      if (!session.pages[key]) session.pages[key] = [];
       const comment = { id: Date.now(), text: "", screenshot: result.dataUrl };
-      session.pages[key].unshift(comment);
+      ensurePageEntry(key).comments.unshift(comment);
       saveSession();
       render();
       focusCommentById(comment.id);
@@ -433,7 +445,7 @@
     if (!source) return;
     const key = currentPageKey();
     const duplicate = { id: Date.now(), text: source.text, screenshot: source.screenshot };
-    session.pages[key].unshift(duplicate);
+    ensurePageEntry(key).comments.unshift(duplicate);
     captureError = null;
     captureErrorCommentId = null;
     saveSession();
@@ -592,29 +604,71 @@
   });
 
   function buildReportHtml() {
-    const pagesHtml = Object.entries(session?.pages || {})
-      .filter(([, list]) => list.length > 0)
-      .map(([pageUrl, list]) => {
-        const commentsHtml = list
-          .map(
-            (comment, index) => `<div class="comment">
-<h3>Comment ${index + 1}</h3>
-<p>${escapeHtml(comment.text).replace(/\n/g, "<br>")}</p>
-${comment.screenshot ? `<img src="${comment.screenshot}">` : ""}
-</div>`,
-          )
+    const pages = Object.entries(session?.pages || {}).filter(([, page]) => page.comments.length > 0);
+    const totalCount = totalCommentCount();
+    const pageCount = pages.length;
+
+    // Global across the whole report, not per-page, so two different
+    // pages' anchors can never collide.
+    let shotIndex = 0;
+    const lightboxTargets = [];
+
+    const tocHtml = pages
+      .map(([url, page], i) => `<li><a href="#page-${i}">${escapeHtml(page.title || url)}</a></li>`)
+      .join("\n");
+
+    const pagesHtml = pages
+      .map(([url, page], i) => {
+        const commentsHtml = page.comments
+          .map((comment) => {
+            let shotsHtml = "";
+            // Only comments carry a screenshot (a single one, since
+            // comments were simplified back to one shot each) - the
+            // lightbox target lives at the end of the document; :target
+            // matching doesn't care where in the DOM it sits.
+            if (comment.screenshot) {
+              const shotId = `shot-${shotIndex}`;
+              shotIndex += 1;
+              shotsHtml = `<div class="comment-shots"><a href="#${shotId}" class="shot-thumb-link"><img class="shot-thumb" src="${comment.screenshot}" alt="Screenshot" /></a></div>`;
+              lightboxTargets.push(
+                `<a href="#_" id="${shotId}" class="lightbox"><img src="${comment.screenshot}" alt="Screenshot" /></a>`,
+              );
+            }
+            return `<div class="comment"><p class="comment-text">${escapeHtml(comment.text).replace(/\n/g, "<br>")}</p>${shotsHtml}</div>`;
+          })
           .join("\n");
-        return `<h2>${escapeHtml(pageUrl)}</h2>\n${commentsHtml}`;
+
+        return `<div class="page-section" id="page-${i}">
+<h2>${escapeHtml(page.title || url)}</h2>
+<p class="page-url">${escapeHtml(url)}</p>
+${commentsHtml}
+</div>`;
       })
       .join("\n");
 
-    const totalCount = totalCommentCount();
     return `<!doctype html>
 <html>
+<head>
+<meta charset="utf-8">
+<title>Feedback session</title>
+<style>${REPORT_CSS}</style>
+</head>
 <body>
+<div class="report-header">
 <h1>Feedback session</h1>
-<p>Started ${session ? new Date(session.startedAt).toLocaleString() : "-"} — ${totalCount} comment${totalCount === 1 ? "" : "s"} across ${Object.keys(session?.pages || {}).length} page${Object.keys(session?.pages || {}).length === 1 ? "" : "s"}</p>
+<p class="report-meta">Started ${session ? new Date(session.startedAt).toLocaleString() : "-"} — ${totalCount} comment${totalCount === 1 ? "" : "s"} across ${pageCount} page${pageCount === 1 ? "" : "s"}</p>
+${userName ? `<p class="report-meta">Reviewer: ${escapeHtml(userName)}</p>` : ""}
+${userEmail ? `<p class="report-meta">Email: ${escapeHtml(userEmail)}</p>` : ""}
+${session?.details ? `<p class="report-meta">Details: ${escapeHtml(session.details)}</p>` : ""}
+</div>
+<nav class="toc">
+<h2>Pages reviewed</h2>
+<ol>
+${tocHtml}
+</ol>
+</nav>
 ${pagesHtml}
+${lightboxTargets.join("\n")}
 </body>
 </html>
 `;

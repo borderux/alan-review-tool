@@ -1,0 +1,117 @@
+body {
+  font-family: system-ui, sans-serif;
+  color: #1e1e2e;
+  max-width: 400px;
+  margin: 40px auto;
+  padding: 0 16px;
+}
+h1 {
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+.report-meta {
+  font-size: 12px;
+  color: #666;
+  margin: 0 0 4px;
+}
+.report-header {
+  margin-bottom: 20px;
+}
+
+.toc {
+  margin: 0 0 20px;
+  padding: 12px;
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+.toc h2 {
+  font-size: 13px;
+  margin: 0 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #666;
+}
+.toc ol {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+.toc li {
+  margin-bottom: 2px;
+}
+.toc a {
+  color: #2563eb;
+  text-decoration: none;
+}
+.toc a:hover {
+  text-decoration: underline;
+}
+
+.page-section {
+  border-top: 2px solid #ddd;
+  padding-top: 12px;
+  margin-top: 20px;
+}
+.page-section h2 {
+  font-size: 15px;
+  margin: 0 0 2px;
+}
+.page-url {
+  font-size: 11px;
+  color: #888;
+  word-break: break-all;
+  margin: 0 0 12px;
+}
+
+.comment {
+  border-top: 1px solid #eee;
+  padding: 8px 0;
+}
+.comment:first-of-type {
+  border-top: none;
+}
+.comment-text {
+  font-size: 13px;
+  margin: 0;
+  white-space: pre-wrap;
+}
+.comment-shots {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.shot-thumb-link {
+  display: inline-block;
+}
+.shot-thumb {
+  display: block;
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+
+/* Pure-CSS lightbox: no JavaScript. The overlay is itself an anchor -
+   :target shows it when its id matches the URL fragment, and clicking
+   anywhere on it (including the image) navigates to a non-matching
+   fragment, which is how it closes. */
+.lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+.lightbox:target {
+  display: flex;
+}
+.lightbox img {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: 4px;
+}
