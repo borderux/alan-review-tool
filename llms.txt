@@ -1,0 +1,45 @@
+# Alan Review Tool
+
+> A Manifest V3 browser extension (Chrome and Firefox) for capturing UI/UX
+> feedback on any website - text comments and screenshots, organized into a
+> session, exported as a self-contained HTML report.
+
+No backend, no bundler, no site-side integration required - a reviewer
+clicks the toolbar icon on any tab and a slide-out panel appears.
+
+## Reference documentation
+
+- [README](README.md): What this is, how to build it, how to load it in
+  Chrome/Firefox, and the local development scripts.
+- [ARCHITECTURE](ARCHITECTURE.md): Injection/lifecycle model, the storage
+  data model, the report format, the build's file-inlining mechanism, and
+  the migration discipline required for any data-shape change.
+- [AGENTS](AGENTS.md): Rules for AI agents making changes to this codebase -
+  read this and ARCHITECTURE.md before planning a change.
+
+## Layout
+
+- `src/manifest.chrome.json`, `src/manifest.firefox.json` - Per-browser MV3
+  manifests. Differ only in their `background` block.
+- `src/background.js` - Service worker: injects `content.js` on toolbar
+  click, captures screenshots on request from the content script.
+- `src/content.js` - The entire panel: rendering, session/comment state,
+  screenshot capture and cyan-annotation lightbox, and the downloaded
+  report's HTML generation. Re-injected fresh on every toolbar click.
+- `src/content.css` - Styles the live panel (loaded via `<link>` inside its
+  shadow root).
+- `src/report.css` - Styles the downloaded report only. Inlined into
+  `content.js` at build time, not loaded at runtime.
+- `src/ai-report-instructions.txt` - Hidden, AI-readable instructions
+  explaining the report's structure, also inlined into `content.js` at
+  build time.
+- `build.js` - Copies the shared files into `dist/chrome` and
+  `dist/firefox`, pairs each with its own manifest, and performs the
+  report.css/ai-report-instructions.txt inlining step.
+- `dist/` - Build output (git-ignored). Load `dist/chrome` or
+  `dist/firefox` as an unpacked/temporary extension to run it.
+- `.changeset/` - Changesets config; this package is private and never
+  published to npm, so versioning/changelog tracking is the point, not a
+  registry publish.
+- `.github/workflows/` - `pull-request.yml` (lint + build on every PR) and
+  `release.yml` (Changesets' Version-Packages-PR flow).

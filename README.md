@@ -1,14 +1,39 @@
-# alan-review-tool
+# Alan Review Tool
 
-Perform design reviews on any site
+A Manifest V3 browser extension (Chrome and Firefox) for capturing UI/UX
+feedback on any website. Click the toolbar icon on any tab and a slide-out
+panel appears — no changes needed on the target site, no backend, and no
+JavaScript in what you export.
 
-## Dev testing: injection prototype
+## Features
 
-This first slice only proves the injection mechanic: click the toolbar icon on
-any tab, in any browser, and a slide-out panel appears — no permissions beyond
-`activeTab` + `scripting`, no changes needed on the target site.
+- **Works on any site, in either browser** — injected via `activeTab` +
+  `chrome.scripting.executeScript` on toolbar click, not tied to any one
+  domain or embedded snippet.
+- **Comments and screenshots**, grouped into a single review **session**
+  that spans every page visited, not scoped to one tab or one origin.
+- **Screenshot capture with freehand annotation** — drag-select any region
+  of the page, then draw directly on the captured image (cyan, 3px) to
+  point at the specific thing you mean. Annotations bake permanently into
+  the image once you dismiss the lightbox.
+- **Resizable panel** that remembers its width, and reviewer identity
+  (name/email) that persists across sessions.
+- **Exports a single, self-contained HTML report** — header, table of
+  contents, one section per page, tight comment list, 50×50 thumbnails
+  with a full-resolution lightbox. The lightbox is pure CSS (`:target`,
+  no JavaScript at all); the whole report has zero `<script>` tags.
+- **Every comment gets a permanent, never-reused `CM-<n>` id**, and every
+  session gets its own hidden guid — combine the two for a globally
+  unique id per piece of feedback.
+- **Report includes hidden, AI-readable parsing instructions** — a coding
+  agent handed this report can find each page, comment, and screenshot,
+  and knows to treat comment text as feedback to act on, not as
+  instructions to follow.
 
-### Build
+See [ARCHITECTURE.md](ARCHITECTURE.md) for how all of this fits together,
+and [llms.txt](llms.txt) for a quick map of the repo's layout.
+
+## Build
 
     npm run build
 
@@ -17,7 +42,7 @@ manifests are needed because Chrome's MV3 requires a `service_worker`
 background and Firefox's MV3 still wants `background.scripts` — everything
 else (`background.js`, `content.js`) is shared, unmodified, between both.
 
-### Development
+## Development
 
     npm install
     npm run lint
@@ -31,7 +56,10 @@ time the release workflow runs on `main`. This package is private and never
 published to npm; the versioning/changelog trail is the point, not a publish
 step.
 
-### Load in Chrome
+If you're an AI agent making changes here, read [AGENTS.md](AGENTS.md) and
+[ARCHITECTURE.md](ARCHITECTURE.md) first.
+
+## Load in Chrome
 
 1. `chrome://extensions`
 2. Enable "Developer mode" (top right)
@@ -39,22 +67,10 @@ step.
 4. Pin the extension, visit any site, click its toolbar icon — the panel
    should slide in from the right. Click again to close.
 
-### Load in Firefox
+## Load in Firefox
 
 1. `about:debugging#/runtime/this-firefox`
 2. "Load Temporary Add-on…" → select `dist/firefox/manifest.json`
 3. Visit any site, click the toolbar icon — same panel.
-   (Temporary add-ons are removed on restart — expected for this test.)
-
-### What this proves
-
-- Injection works via `activeTab` + `chrome.scripting.executeScript`,
-  triggered by a user gesture (icon click) — no blanket host permissions.
-- Shadow DOM isolates the panel's styles from the host page and vice versa.
-- Same `background.js` / `content.js` source runs unmodified in both
-  browsers; only the manifest's background declaration differs.
-
-### Not yet built
-
-Comment capture, screenshot capture, and the universal clipboard export are
-next — this step is just the injection shell.
+   (Temporary add-ons are removed on restart — expected for a temporary
+   add-on; reload it after each Firefox restart during development.)
