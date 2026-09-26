@@ -138,7 +138,14 @@
   panelRoot.style.height = "100%";
   shadow.appendChild(panelRoot);
 
-  function openLightbox(src) {
+  // Freehand annotation on the lightbox. Drawing happens on a transparent
+  // canvas laid exactly over the <img>, in the image's own natural-
+  // resolution coordinate space (not its displayed CSS size) so the
+  // strokes stay crisp and correctly placed once composited into the
+  // full-resolution screenshot - line width is scaled to compensate, so
+  // "3px" still means 3 visual px regardless of how much smaller the
+  // image displays than its native size.
+  function openLightbox(comment) {
     const overlay = document.createElement("div");
     overlay.style.all = "initial";
     overlay.style.position = "fixed";
@@ -146,28 +153,148 @@
     overlay.style.zIndex = "2147483647";
     overlay.style.background = "rgba(0, 0, 0, 0.85)";
     overlay.style.display = "flex";
+    overlay.style.flexDirection = "column";
     overlay.style.alignItems = "center";
     overlay.style.justifyContent = "center";
-    overlay.style.cursor = "zoom-out";
+    overlay.style.gap = "12px";
+
+    const imageWrap = document.createElement("div");
+    imageWrap.style.position = "relative";
+    imageWrap.style.lineHeight = "0";
 
     const img = document.createElement("img");
-    img.src = src;
+    img.src = comment.screenshot;
+    img.style.display = "block";
     img.style.maxWidth = "90vw";
-    img.style.maxHeight = "90vh";
+    img.style.maxHeight = "75vh";
     img.style.boxShadow = "0 4px 24px rgba(0, 0, 0, 0.5)";
-    overlay.appendChild(img);
 
-    function onKeyDown(event) {
-      if (event.key === "Escape") close();
+    const drawCanvas = document.createElement("canvas");
+    drawCanvas.style.position = "absolute";
+    drawCanvas.style.top = "0";
+    drawCanvas.style.left = "0";
+    drawCanvas.style.cursor = "crosshair";
+    const ctx = drawCanvas.getContext("2d");
+
+    function sizeCanvasToImage() {
+      drawCanvas.width = img.naturalWidth;
+      drawCanvas.height = img.naturalHeight;
+      drawCanvas.style.width = `${img.clientWidth}px`;
+      drawCanvas.style.height = `${img.clientHeight}px`;
     }
+    imageWrap.appendChild(img);
+    imageWrap.appendChild(drawCanvas);
+
+    const buttonRow = document.createElement("div");
+    buttonRow.style.display = "flex";
+    buttonRow.style.gap = "8px";
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.textContent = "Delete";
+    const clearBtn = document.createElement("button");
+    clearBtn.textContent = "Clear Annotations";
+    for (const btn of [deleteBtn, clearBtn]) {
+      btn.style.padding = "6px 12px";
+      btn.style.cursor = "pointer";
+      btn.style.border = "1px solid rgba(255, 255, 255, 0.3)";
+      btn.style.borderRadius = "4px";
+      btn.style.background = "#1e1e2e";
+      btn.style.color = "#fff";
+      btn.style.font = "13px system-ui, sans-serif";
+    }
+    buttonRow.appendChild(deleteBtn);
+    buttonRow.appendChild(clearBtn);
+
+    overlay.appendChild(imageWrap);
+    overlay.appendChild(buttonRow);
+    document.documentElement.appendChild(overlay);
+
+    // Only after the image is actually in the rendered tree does
+    // img.clientWidth mean anything - checking img.complete and sizing
+    // the canvas before this point (even though the data URI had already
+    // decoded) measured an unlaid-out element and got 0 every time.
+    if (img.complete) sizeCanvasToImage();
+    else img.addEventListener("load", sizeCanvasToImage);
+
+    let drawing = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    function toCanvasPoint(event) {
+      const rect = drawCanvas.getBoundingClientRect();
+      const scale = drawCanvas.width / rect.width;
+      return { x: (event.clientX - rect.left) * scale, y: (event.clientY - rect.top) * scale, scale };
+    }
+
+    drawCanvas.addEventListener("mousedown", (event) => {
+      drawing = true;
+      const p = toCanvasPoint(event);
+      lastX = p.x;
+      lastY = p.y;
+    });
+    drawCanvas.addEventListener("mousemove", (event) => {
+      if (!drawing) return;
+      const p = toCanvasPoint(event);
+      ctx.strokeStyle = "#00ffff";
+      ctx.lineWidth = 3 * p.scale;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      lastX = p.x;
+      lastY = p.y;
+    });
+    function stopDrawing() {
+      drawing = false;
+    }
+    drawCanvas.addEventListener("mouseup", stopDrawing);
+    drawCanvas.addEventListener("mouseleave", stopDrawing);
+
+    clearBtn.addEventListener("click", () => {
+      ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+    });
+
     function close() {
       overlay.remove();
       document.removeEventListener("keydown", onKeyDown, true);
     }
 
-    overlay.addEventListener("click", close);
+    deleteBtn.addEventListener("click", () => {
+      comment.screenshot = null;
+      saveSession();
+      close();
+      render();
+    });
+
+    // Dismissing (clicking the dark background, not the image or the
+    // buttons) bakes whatever's drawn into the actual image permanently -
+    // from that point on it's just pixels, not an editable annotation
+    // layer, so reopening the lightbox later has nothing left to clear.
+    function bakeAndClose() {
+      const bakeCanvas = document.createElement("canvas");
+      bakeCanvas.width = img.naturalWidth;
+      bakeCanvas.height = img.naturalHeight;
+      const bctx = bakeCanvas.getContext("2d");
+      bctx.drawImage(img, 0, 0);
+      bctx.drawImage(drawCanvas, 0, 0);
+      comment.screenshot = bakeCanvas.toDataURL("image/jpeg", 0.9);
+      saveSession();
+      close();
+      render();
+    }
+
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) bakeAndClose();
+    });
+
+    // Escape is a plain cancel, same as it is for the drag-select overlay
+    // elsewhere - it discards whatever's been drawn rather than baking it.
+    function onKeyDown(event) {
+      if (event.key === "Escape") close();
+    }
     document.addEventListener("keydown", onKeyDown, true);
-    document.documentElement.appendChild(overlay);
   }
 
   function escapeHtml(str) {
@@ -304,7 +431,8 @@
   shadow.addEventListener("click", (event) => {
     const thumb = event.target.closest(".thumb");
     if (thumb) {
-      openLightbox(thumb.src);
+      const comment = getPageComments().find((c) => String(c.id) === thumb.dataset.id);
+      if (comment) openLightbox(comment);
       return;
     }
 
@@ -496,7 +624,7 @@ ${pagesHtml}
         <div class="comment-text" data-id="${comment.id}" contenteditable="true">${escapeHtml(comment.text)}</div>
         ${
           comment.screenshot
-            ? `<img class="thumb" src="${comment.screenshot}" alt="Captured region" />`
+            ? `<img class="thumb" src="${comment.screenshot}" alt="Captured region" data-id="${comment.id}" />`
             : `<button class="capture-btn-icon" type="button" data-id="${comment.id}" title="Capture screenshot">${CAMERA_SVG}</button>`
         }
         ${
