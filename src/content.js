@@ -47,6 +47,21 @@
   const shadow = host.attachShadow({ mode: "open" });
   const isFirefox = navigator.userAgent.includes("Firefox");
 
+  // The stylesheet loads once, here, rather than as a <style> block inside
+  // render()'s template: render() replaces its target's entire innerHTML on
+  // every state change, and a <link> re-added that way would refetch and
+  // reapply on every keystroke-triggered re-render, flashing unstyled
+  // content each time. panelRoot is what render() actually rewrites;
+  // shadow.getElementById/querySelector still work unchanged since they
+  // search the whole shadow tree regardless of this extra nesting level.
+  const styleLink = document.createElement("link");
+  styleLink.rel = "stylesheet";
+  styleLink.href = chrome.runtime.getURL("content.css");
+  shadow.appendChild(styleLink);
+
+  const panelRoot = document.createElement("div");
+  shadow.appendChild(panelRoot);
+
   function openLightbox(src) {
     const overlay = document.createElement("div");
     overlay.style.all = "initial";
@@ -275,119 +290,7 @@ ${commentsHtml}
   }
 
   function render() {
-    shadow.innerHTML = `
-      <style>
-        :host { display: block; }
-        .resizer {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 6px;
-          height: 100%;
-          cursor: ew-resize;
-          background: transparent;
-        }
-        .resizer:hover, .resizer.dragging {
-          background: rgba(255, 255, 255, 0.25);
-        }
-        .panel {
-          font-family: system-ui, sans-serif;
-          width: 100%;
-          height: 100%;
-          background: #1e1e2e;
-          color: #fff;
-          box-shadow: -4px 0 12px rgba(0, 0, 0, 0.3);
-          padding: 16px;
-          box-sizing: border-box;
-          overflow-y: auto;
-        }
-        .panel-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-        h2 { margin: 0 0 8px; font-size: 16px; }
-        p { font-size: 13px; opacity: 0.8; }
-        button {
-          padding: 6px 12px;
-          cursor: pointer;
-        }
-        .toolbar {
-          margin-top: 12px;
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-        button:disabled {
-          opacity: 0.5;
-          cursor: default;
-        }
-        .composer {
-          margin-top: 12px;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-        .composer textarea {
-          width: 100%;
-          min-height: 60px;
-          box-sizing: border-box;
-          font-family: inherit;
-          font-size: 13px;
-          padding: 6px;
-        }
-        .composer-actions {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-        .thumb {
-          display: block;
-          max-width: 100px;
-          max-height: 100px;
-          border-radius: 4px;
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          cursor: zoom-in;
-        }
-        .shot-row {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-        }
-        .shot-thumb {
-          position: relative;
-          display: inline-block;
-        }
-        .remove-shot {
-          position: absolute;
-          top: -6px;
-          right: -6px;
-          width: 18px;
-          height: 18px;
-          padding: 0;
-          line-height: 1;
-          border-radius: 50%;
-          background: #d33;
-          color: #fff;
-          border: none;
-        }
-        .capture-error {
-          color: #ff8080;
-          opacity: 1;
-        }
-        .comments {
-          margin-top: 16px;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-        .comment-item {
-          background: rgba(255, 255, 255, 0.06);
-          border-radius: 6px;
-          padding: 8px;
-        }
-        .comment-item p { margin: 6px 0 0; opacity: 1; }
-      </style>
+    panelRoot.innerHTML = `
       <div class="resizer"></div>
       <div class="panel">
         <div class="panel-header">
