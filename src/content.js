@@ -859,7 +859,7 @@ ${lightboxTargets.join("\n")}
         <div class="panel-header">
           <div class="panel-title">
             <img src="${LOGO_URL}" alt="" class="logo" />
-            <h2>ALAN</h2>
+            <h2>ALAN review tool</h2>
           </div>
           <button id="close" type="button" class="round-btn round-btn-grey" title="Close">×</button>
         </div>

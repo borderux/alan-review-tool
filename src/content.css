@@ -37,8 +37,14 @@
 }
 .panel-title .logo {
   display: block;
-  height: 18px;
+  height: 36px;
   width: auto;
+}
+.panel-title h2 {
+  /* h2's global bottom margin would make align-items: center on this row
+     center the margin box, not the visible text - pulling the glyphs
+     visibly off-center against the taller logo next to it. */
+  margin: 0;
 }
 h2 {
   margin: 0 0 8px;
