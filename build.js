@@ -17,7 +17,12 @@ const INLINES = [
   },
 ];
 
-const SHARED_FILES = ["background.js", "content.js", "content.css"];
+const SHARED_FILES = [
+  "background.js",
+  "content.js",
+  "content.css",
+  "alan-logo.png",
+];
 const TARGETS = {
   chrome: "manifest.chrome.json",
   firefox: "manifest.firefox.json",

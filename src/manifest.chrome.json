@@ -12,7 +12,7 @@
   "permissions": ["activeTab", "scripting", "storage"],
   "web_accessible_resources": [
     {
-      "resources": ["content.css"],
+      "resources": ["content.css", "alan-logo.png"],
       "matches": ["<all_urls>"]
     }
   ]

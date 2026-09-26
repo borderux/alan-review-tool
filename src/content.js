@@ -229,6 +229,8 @@
   styleLink.href = chrome.runtime.getURL("content.css");
   shadow.appendChild(styleLink);
 
+  const LOGO_URL = chrome.runtime.getURL("alan-logo.png");
+
   const panelRoot = document.createElement("div");
   // A percentage height only resolves against an ancestor with an explicit
   // height - without this, .panel's height: 100% (in content.css) has
@@ -855,7 +857,10 @@ ${lightboxTargets.join("\n")}
       <div class="resizer"></div>
       <div class="panel">
         <div class="panel-header">
-          <h2>Alan Review Tool</h2>
+          <div class="panel-title">
+            <img src="${LOGO_URL}" alt="" class="logo" />
+            <h2>ALAN</h2>
+          </div>
           <button id="close" type="button" class="round-btn round-btn-grey" title="Close">×</button>
         </div>
 

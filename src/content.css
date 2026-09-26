@@ -30,6 +30,16 @@
   align-items: center;
   justify-content: space-between;
 }
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.panel-title .logo {
+  display: block;
+  height: 18px;
+  width: auto;
+}
 h2 {
   margin: 0 0 8px;
   font-size: 16px;
