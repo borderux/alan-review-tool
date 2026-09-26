@@ -162,6 +162,54 @@
     return div.innerHTML;
   }
 
+  // A single self-contained file sidesteps the whole "which representation
+  // does this target pick" problem from the per-comment clipboard button -
+  // there's only one thing to hand over, and it carries everything
+  // (comments and their inline screenshots) rather than making a paste
+  // target choose between them.
+  function buildReportHtml() {
+    const commentsHtml = comments
+      .map(
+        (comment) => `
+      <div class="comment">
+        <p>${escapeHtml(comment.text).replace(/\n/g, "<br>")}</p>
+        ${comment.screenshot ? `<img src="${comment.screenshot}" alt="Screenshot" />` : ""}
+      </div>`,
+      )
+      .join("\n");
+
+    return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Alan Review Tool — ${escapeHtml(location.hostname)}</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 16px; color: #1e1e2e; }
+  h1 { font-size: 20px; }
+  .meta { color: #666; font-size: 13px; margin-bottom: 24px; }
+  .comment { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  .comment img { max-width: 100%; border-radius: 4px; margin-top: 8px; }
+</style>
+</head>
+<body>
+  <h1>Feedback for ${escapeHtml(location.hostname)}</h1>
+  <p class="meta">Captured ${new Date().toLocaleString()} — ${comments.length} comment${comments.length === 1 ? "" : "s"}</p>
+  ${commentsHtml}
+</body>
+</html>
+`;
+  }
+
+  function downloadReport() {
+    const blob = new Blob([buildReportHtml()], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `alan-review-${location.hostname}-${Date.now()}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function renderComposer() {
     return `
       <div class="composer">
@@ -225,7 +273,16 @@
           padding: 6px 12px;
           cursor: pointer;
         }
-        #new-comment { margin-top: 12px; }
+        .toolbar {
+          margin-top: 12px;
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        button:disabled {
+          opacity: 0.5;
+          cursor: default;
+        }
         .composer {
           margin-top: 12px;
           display: flex;
@@ -279,7 +336,14 @@
         <p>Injected on: ${location.hostname}</p>
         <p>Browser: ${isFirefox ? "Firefox" : "Chromium-based"}</p>
 
-        ${composerOpen ? renderComposer() : `<button id="new-comment" type="button">+ New comment</button>`}
+        ${
+          composerOpen
+            ? renderComposer()
+            : `<div class="toolbar">
+                <button id="new-comment" type="button">+ New comment</button>
+                <button id="download-report" type="button" ${comments.length ? "" : "disabled"}>Download report</button>
+              </div>`
+        }
 
         <div class="comments">
           ${comments.map(renderCommentItem).join("")}
@@ -301,6 +365,8 @@
       captureError = null;
       render();
     });
+
+    shadow.getElementById("download-report")?.addEventListener("click", downloadReport);
 
     shadow.getElementById("cancel-btn")?.addEventListener("click", () => {
       composerOpen = false;
