@@ -649,9 +649,13 @@
           })
           .join("\n");
 
+        // url is the full page key (origin + pathname + search) - that's
+        // exactly what the report should link to, but the visible text
+        // drops the search params so the link doesn't read as a wall of
+        // query-string noise.
+        const urlWithoutSearch = url.split("?")[0];
         return `<div class="page-section" id="page-${i}">
-<h2>${escapeHtml(page.title || url)}</h2>
-<p class="page-url">${escapeHtml(url)}</p>
+<p class="page-url"><a href="${escapeHtml(url)}">${escapeHtml(urlWithoutSearch)}</a></p>
 ${commentsHtml}
 </div>`;
       })
