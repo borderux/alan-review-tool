@@ -83,9 +83,55 @@
   // replaces the shadow root's entire innerHTML on every state change, which
   // would tear down and re-add a direct listener each time. The shadow root
   // itself never gets replaced, so a listener on it survives every render.
+  function flashButton(buttonEl, label) {
+    const original = buttonEl.textContent;
+    buttonEl.textContent = label;
+    buttonEl.disabled = true;
+    setTimeout(() => {
+      buttonEl.textContent = original;
+      buttonEl.disabled = false;
+    }, 1200);
+  }
+
+  // Two representations in one ClipboardItem: text/html so a rich target
+  // (Docs, Slack, ChatGPT's input, Jira) shows the screenshot inline, and
+  // text/plain as a markdown fallback so a plain textarea still gets
+  // something legible instead of nothing. See the earlier thread for why
+  // this beats a Jira-API-shaped "backbone."
+  async function copyCommentToClipboard(comment, buttonEl) {
+    const html = `${comment.text ? `<p>${escapeHtml(comment.text)}</p>` : ""}${
+      comment.screenshot ? `<img src="${comment.screenshot}" alt="Screenshot" />` : ""
+    }`;
+    const plain = `${comment.text || ""}${
+      comment.screenshot ? `\n\n![Screenshot](${comment.screenshot})` : ""
+    }`.trim();
+
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([plain], { type: "text/plain" }),
+        }),
+      ]);
+      flashButton(buttonEl, "Copied!");
+    } catch (err) {
+      console.error("Alan Review Tool: clipboard write failed.", err);
+      flashButton(buttonEl, "Copy failed");
+    }
+  }
+
   shadow.addEventListener("click", (event) => {
     const thumb = event.target.closest(".thumb");
-    if (thumb) openLightbox(thumb.src);
+    if (thumb) {
+      openLightbox(thumb.src);
+      return;
+    }
+
+    const copyBtn = event.target.closest(".copy-btn");
+    if (copyBtn) {
+      const comment = comments.find((c) => String(c.id) === copyBtn.dataset.id);
+      if (comment) copyCommentToClipboard(comment, copyBtn);
+    }
   });
 
   // In-memory only - lost on close/navigation, same as the rest of this
@@ -122,6 +168,7 @@
       <div class="comment-item">
         ${comment.screenshot ? `<img class="thumb" src="${comment.screenshot}" alt="Captured region" />` : ""}
         <p>${escapeHtml(comment.text)}</p>
+        <button class="copy-btn" type="button" data-id="${comment.id}">Copy to clipboard</button>
       </div>
     `;
   }
