@@ -99,6 +99,17 @@
   // something legible instead of nothing. See the earlier thread for why
   // this beats a Jira-API-shaped "backbone."
   async function copyCommentToClipboard(comment, buttonEl) {
+    // Chrome's navigator.clipboard.write() does not implement multiple
+    // ClipboardItems in one call ("Support for multiple ClipboardItems is
+    // not implemented" - confirmed directly, not assumed), so text and
+    // image can't be offered as two independent clipboard entries the way
+    // Word/Docs handle mixed copies. Everything has to live in ONE item as
+    // alternative representations, and a paste target picks exactly one of
+    // them - which is also the real explanation for ChatGPT showing raw
+    // base64 text: it read text/plain rather than rendering the <img> in
+    // text/html. Offering image/png directly, rather than only buried
+    // inside an <img> tag, at least gives an image-preferring target
+    // something to pick that isn't a wall of base64.
     const html = `${comment.text ? `<p>${escapeHtml(comment.text)}</p>` : ""}${
       comment.screenshot ? `<img src="${comment.screenshot}" alt="Screenshot" />` : ""
     }`;
@@ -106,13 +117,16 @@
       comment.screenshot ? `\n\n![Screenshot](${comment.screenshot})` : ""
     }`.trim();
 
+    const representations = {
+      "text/html": new Blob([html], { type: "text/html" }),
+      "text/plain": new Blob([plain], { type: "text/plain" }),
+    };
+    if (comment.screenshot) {
+      representations["image/png"] = await (await fetch(comment.screenshot)).blob();
+    }
+
     try {
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          "text/html": new Blob([html], { type: "text/html" }),
-          "text/plain": new Blob([plain], { type: "text/plain" }),
-        }),
-      ]);
+      await navigator.clipboard.write([new ClipboardItem(representations)]);
       flashButton(buttonEl, "Copied!");
     } catch (err) {
       console.error("Alan Review Tool: clipboard write failed.", err);
