@@ -65,9 +65,13 @@ button:disabled {
   gap: 6px;
 }
 
-#new-comment {
+.toolbar {
   margin-top: 12px;
-  width: 100%;
+  display: flex;
+  gap: 8px;
+}
+.toolbar button {
+  flex: 1;
 }
 
 /* Active and read-only comments share one visual treatment - a card with
@@ -145,7 +149,7 @@ button:disabled {
   align-items: center;
   justify-content: center;
   background: none;
-  border: 1px dashed rgba(255, 255, 255, 0.3);
+  border: 1px solid #999;
   border-radius: 4px;
   padding: 0;
 }

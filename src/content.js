@@ -198,6 +198,60 @@
     render();
   }
 
+  // Captures first, then creates the comment - if the user cancels the
+  // drag-select (Escape, or too small to count), nothing gets added at
+  // all, since the entire point of this button is the screenshot itself.
+  async function handleNewScreenshot() {
+    captureError = null;
+    try {
+      const rect = await selectRegion();
+      if (!rect) return;
+      const result = await captureAndCrop(rect);
+      if (result.error) {
+        captureError = result.error;
+        render();
+        return;
+      }
+      if (!session) session = { startedAt: Date.now(), pages: {} };
+      const key = currentPageKey();
+      if (!session.pages[key]) session.pages[key] = [];
+      const comment = { id: Date.now(), text: "", screenshot: result.dataUrl };
+      session.pages[key].unshift(comment);
+      activeCommentId = comment.id;
+      saveSession();
+      render();
+    } catch (err) {
+      console.error("Alan Review Tool: screenshot capture failed.", err);
+      captureError = String(err);
+      render();
+    }
+  }
+
+  function focusAtEnd(el) {
+    el.focus();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  // Copy is left alone (it already works natively) - only paste is
+  // intercepted, and deliberately ignores whatever's actually on the
+  // clipboard: the "copy, then paste" gesture is a shortcut for
+  // duplicating the focused comment itself, not a real data transfer.
+  function duplicateComment(source) {
+    if (!source) return;
+    const key = currentPageKey();
+    const duplicate = { id: Date.now(), text: source.text, screenshot: source.screenshot };
+    session.pages[key].unshift(duplicate);
+    activeCommentId = duplicate.id;
+    captureError = null;
+    saveSession();
+    render();
+  }
+
   // Delegated and attached once, here, rather than in wireEvents(): render()
   // replaces panelRoot's entire innerHTML on every state change, which
   // would tear down and re-add a direct listener each time. shadow itself
@@ -237,7 +291,27 @@
     if (captureIconBtn) {
       const comment = getPageComments().find((c) => c.id === activeCommentId);
       if (comment) handleCapture(comment);
+      return;
     }
+
+    // Clicking anywhere in a read-only comment's card - not just precisely
+    // on its text - focuses it with the cursor at the end, so continuing
+    // to add to an existing comment doesn't require a precise click.
+    const readonlyCard = event.target.closest(".comment-item");
+    if (readonlyCard) {
+      const textEl = readonlyCard.querySelector(".readonly-text");
+      if (textEl) focusAtEnd(textEl);
+    }
+  });
+
+  shadow.addEventListener("paste", (event) => {
+    const target = event.target.closest("#active-comment-text, .readonly-text");
+    if (!target) return;
+    event.preventDefault();
+
+    const sourceId = target.id === "active-comment-text" ? activeCommentId : Number(target.dataset.id);
+    const source = getPageComments().find((c) => c.id === sourceId);
+    duplicateComment(source);
   });
 
   function autoGrowTextarea(el) {
@@ -360,7 +434,12 @@ ${pagesHtml}
           </div>
         </div>
 
-        <button id="new-comment" type="button">+ New comment</button>
+        <div class="toolbar">
+          <button id="new-comment" type="button">+ New comment</button>
+          <button id="new-screenshot" type="button">+ New screenshot</button>
+        </div>
+
+        ${!activeComment && captureError ? `<p class="capture-error">Couldn't capture a screenshot: ${escapeHtml(captureError)}</p>` : ""}
 
         ${activeComment ? renderActiveComment(activeComment) : ""}
 
@@ -386,6 +465,7 @@ ${pagesHtml}
     });
 
     shadow.getElementById("new-comment").addEventListener("click", handleNewComment);
+    shadow.getElementById("new-screenshot").addEventListener("click", handleNewScreenshot);
 
     shadow.getElementById("clear-session")?.addEventListener("click", () => {
       if (!confirm("Clear the current session? This removes every comment across every page.")) return;
