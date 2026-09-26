@@ -184,7 +184,15 @@
     if (el) focusAtEnd(el);
   }
 
+  // Clicking the camera button, or starting the drag-select overlay
+  // (outside the shadow root entirely), both blur the comment's text -
+  // the empty-comment cleanup below has to know a capture is under way so
+  // it doesn't delete a comment out from under itself before the user
+  // even finishes selecting a region.
+  let captureInProgress = false;
+
   async function handleCapture(comment) {
+    captureInProgress = true;
     captureError = null;
     captureErrorCommentId = comment.id;
     try {
@@ -201,6 +209,7 @@
       console.error("Alan Review Tool: screenshot capture failed.", err);
       captureError = String(err);
     }
+    captureInProgress = false;
     saveSession();
     render();
     if (!captureError) focusCommentById(comment.id);
@@ -299,7 +308,35 @@
     if (card) {
       const textEl = card.querySelector(".comment-text");
       if (textEl) focusAtEnd(textEl);
+      return;
     }
+
+    // Clicking the panel's own empty background - not any specific
+    // control - behaves like "+ New comment", a quicker way to start one
+    // than aiming for a small button. Checked by identity (is the click
+    // target literally the container itself) rather than "nothing else
+    // matched", so it can never fire for a click on session-info or the
+    // toolbar buttons, which have their own dedicated handlers elsewhere.
+    if (event.target === shadow.querySelector(".panel") || event.target === shadow.querySelector(".comments")) {
+      handleNewComment();
+    }
+  });
+
+  // A blur/focusout on an empty, screenshot-less comment removes it -
+  // clicking to start a comment and then clicking away without adding
+  // anything shouldn't leave a permanent empty entry behind. focusout
+  // (not blur) because delegation needs it to bubble, which blur doesn't.
+  shadow.addEventListener("focusout", (event) => {
+    if (captureInProgress) return;
+    const textEl = event.target.closest(".comment-text");
+    if (!textEl) return;
+    // Focus moving to the camera/delete button within the SAME card isn't
+    // really "leaving" the comment - only clean up once it genuinely does.
+    const card = textEl.closest(".comment-item");
+    if (event.relatedTarget && card?.contains(event.relatedTarget)) return;
+
+    const comment = getPageComments().find((c) => String(c.id) === textEl.dataset.id);
+    if (comment && !comment.text.trim() && !comment.screenshot) deleteComment(comment.id);
   });
 
   shadow.addEventListener("paste", (event) => {
