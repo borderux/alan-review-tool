@@ -75,8 +75,17 @@ h1 {
 .comment:first-of-type {
   border-top: none;
 }
-.comment-text {
+.comment-body {
   flex: 1;
+  min-width: 0;
+}
+.comment-id {
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  color: #aaa;
+  margin: 0 0 2px;
+}
+.comment-text {
   font-size: 13px;
   margin: 0;
   white-space: pre-wrap;

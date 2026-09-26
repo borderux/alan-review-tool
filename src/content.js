@@ -18,6 +18,26 @@
   // report styling can be edited (and linted) like any other stylesheet.
   const REPORT_CSS = "__REPORT_CSS_PLACEHOLDER__";
 
+  // crypto.randomUUID() needs a secure context - fine on https, but this
+  // extension's whole pitch is "works on any site", including plain http
+  // ones, where randomUUID doesn't exist even though crypto itself does.
+  // getRandomValues() isn't restricted that way, so it's the fallback
+  // instead of reaching for Math.random().
+  function generateGuid() {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+    const bytes = new Uint8Array(16);
+    if (typeof crypto !== "undefined" && crypto.getRandomValues) crypto.getRandomValues(bytes);
+    else for (let i = 0; i < 16; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = [...bytes].map((b) => b.toString(16).padStart(2, "0"));
+    return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10, 16).join("")}`;
+  }
+
+  function formatCommentId(n) {
+    return `CM-${String(n).padStart(4, "0")}`;
+  }
+
   function restorePage() {
     html.style.width = html.dataset.alanReviewToolPrevWidth || "";
     html.style.transition = html.dataset.alanReviewToolPrevTransition || "";
@@ -52,6 +72,22 @@
     for (const key of Object.keys(session.pages)) {
       if (Array.isArray(session.pages[key])) {
         session.pages[key] = { title: key, comments: session.pages[key] };
+      }
+    }
+    // Same story for the session guid and the CM-#### counter: sessions
+    // saved before this feature existed have neither. Backfill a guid, and
+    // assign every already-existing comment a number it never had -
+    // oldest first (each page's own array is newest-first, from unshift),
+    // so numbering approximates real creation order instead of being
+    // arbitrary.
+    if (!session.guid) session.guid = generateGuid();
+    if (typeof session.commentCounter !== "number") session.commentCounter = 0;
+    for (const page of Object.values(session.pages)) {
+      for (const comment of [...page.comments].reverse()) {
+        if (comment.commentNumber == null) {
+          session.commentCounter += 1;
+          comment.commentNumber = session.commentCounter;
+        }
       }
     }
   }
@@ -122,7 +158,15 @@
   }
 
   function ensureSession() {
-    if (!session) session = { startedAt: Date.now(), pages: {}, details: "" };
+    if (!session) session = { startedAt: Date.now(), guid: generateGuid(), commentCounter: 0, pages: {}, details: "" };
+  }
+
+  // The counter only ever goes up, even across deletes - CM-#### plus the
+  // session guid is meant to be a permanent, never-reused id once a
+  // comment's been assigned one, not a position in the current list.
+  function nextCommentNumber() {
+    session.commentCounter += 1;
+    return session.commentCounter;
   }
 
   html.dataset.alanReviewToolPrevWidth = html.style.width;
@@ -408,7 +452,7 @@
   function handleNewComment() {
     ensureSession();
     const key = currentPageKey();
-    const comment = { id: Date.now(), text: "", screenshot: null };
+    const comment = { id: Date.now(), commentNumber: nextCommentNumber(), text: "", screenshot: null };
     // Newest first - every comment renders the same way regardless of
     // position, so nothing else needs to change about the rest of the list.
     ensurePageEntry(key).comments.unshift(comment);
@@ -436,7 +480,7 @@
       }
       ensureSession();
       const key = currentPageKey();
-      const comment = { id: Date.now(), text: "", screenshot: result.dataUrl };
+      const comment = { id: Date.now(), commentNumber: nextCommentNumber(), text: "", screenshot: result.dataUrl };
       ensurePageEntry(key).comments.unshift(comment);
       saveSession();
       render();
@@ -455,7 +499,7 @@
   function duplicateComment(source) {
     if (!source) return;
     const key = currentPageKey();
-    const duplicate = { id: Date.now(), text: source.text, screenshot: source.screenshot };
+    const duplicate = { id: Date.now(), commentNumber: nextCommentNumber(), text: source.text, screenshot: source.screenshot };
     ensurePageEntry(key).comments.unshift(duplicate);
     captureError = null;
     captureErrorCommentId = null;
@@ -645,7 +689,11 @@
                 `<a href="#_" id="${shotId}" class="lightbox"><img src="${comment.screenshot}" alt="Screenshot" /></a>`,
               );
             }
-            return `<div class="comment"><p class="comment-text">${escapeHtml(comment.text).replace(/\n/g, "<br>")}</p>${shotsHtml}</div>`;
+            // The visible CM-#### id plus the hidden session guid (in the
+            // head, once) together make a globally unique id per comment -
+            // shown here since that's the ask, unlike the guid itself.
+            const commentId = comment.commentNumber != null ? formatCommentId(comment.commentNumber) : "";
+            return `<div class="comment" data-comment-id="${escapeHtml(commentId)}"><div class="comment-body">${commentId ? `<p class="comment-id">${escapeHtml(commentId)}</p>` : ""}<p class="comment-text">${escapeHtml(comment.text).replace(/\n/g, "<br>")}</p></div>${shotsHtml}</div>`;
           })
           .join("\n");
 
@@ -666,6 +714,7 @@ ${commentsHtml}
 <head>
 <meta charset="utf-8">
 <title>Feedback session</title>
+${session?.guid ? `<meta name="alan-review-session-id" content="${escapeHtml(session.guid)}">` : ""}
 <style>${REPORT_CSS}</style>
 </head>
 <body>
