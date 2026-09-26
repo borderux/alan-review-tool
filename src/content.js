@@ -44,6 +44,17 @@
   // different site at all. chrome.storage.local is shared across every
   // page this extension runs on, regardless of origin.
   let session = stored[SESSION_STORAGE_KEY] || null;
+  // Sessions saved before pages gained a `title` (back when session.pages[key]
+  // was just a comments array) are still sitting in real users' storage -
+  // normalize them in place so every entry has the new { title, comments }
+  // shape before anything else touches session.pages.
+  if (session) {
+    for (const key of Object.keys(session.pages)) {
+      if (Array.isArray(session.pages[key])) {
+        session.pages[key] = { title: key, comments: session.pages[key] };
+      }
+    }
+  }
   // Separate from session entirely, and never cleared by Clear Session:
   // who's reviewing persists across every session, the same way the
   // panel's own width does, since it's an identity fact rather than
