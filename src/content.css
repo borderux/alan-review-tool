@@ -48,6 +48,30 @@ button:disabled {
   cursor: default;
 }
 
+/* Shared shape for the panel's Close button and each comment's delete X -
+   same style, Close just bigger since it's the one panel-level action
+   rather than a per-comment one. */
+.round-btn {
+  padding: 0;
+  line-height: 1;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+}
+.round-btn-grey {
+  background: #999;
+  color: #1e1e2e;
+}
+.round-btn-red {
+  background: #d33;
+  color: #fff;
+}
+#close.round-btn {
+  width: 26px;
+  height: 26px;
+  font-size: 16px;
+}
+
 .session-info {
   margin-top: 8px;
   padding: 8px 0;
@@ -63,6 +87,44 @@ button:disabled {
   flex-direction: column;
   align-items: flex-end;
   gap: 6px;
+}
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 13px;
+}
+.field-row span {
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+.field-row input {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  color: #fff;
+  padding: 3px 6px;
+}
+#session-details {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 6px;
+  min-height: 2.8em;
+  font-family: inherit;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  color: #fff;
+  padding: 4px 6px;
+  resize: none;
+  overflow: hidden;
 }
 
 .toolbar {
@@ -93,18 +155,13 @@ button:disabled {
 .comment-item:focus-within {
   border-color: rgba(255, 255, 255, 0.5);
 }
-.delete-comment {
+.delete-comment.round-btn {
   position: absolute;
   top: -6px;
   right: -6px;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  line-height: 1;
-  border-radius: 50%;
-  background: #d33;
-  color: #fff;
-  border: none;
+  width: 18px;
+  height: 18px;
+  font-size: 12px;
 }
 
 .thumb,

@@ -3,6 +3,8 @@
   const OVERLAY_ID = "alan-review-tool-selection-overlay";
   const WIDTH_STORAGE_KEY = "alanReviewToolPanelWidth";
   const SESSION_STORAGE_KEY = "alanReviewToolSession";
+  const USER_STORAGE_KEY = "alanReviewToolUser";
+  const EMAIL_STORAGE_KEY = "alanReviewToolEmail";
   const DEFAULT_WIDTH = 320;
   const MIN_WIDTH = 240;
   const MAX_WIDTH = 720;
@@ -28,7 +30,7 @@
     return;
   }
 
-  const stored = await chrome.storage.local.get([WIDTH_STORAGE_KEY, SESSION_STORAGE_KEY]);
+  const stored = await chrome.storage.local.get([WIDTH_STORAGE_KEY, SESSION_STORAGE_KEY, USER_STORAGE_KEY, EMAIL_STORAGE_KEY]);
   let panelWidth = clamp(stored[WIDTH_STORAGE_KEY] ?? DEFAULT_WIDTH, MIN_WIDTH, MAX_WIDTH);
 
   // A single object under one key, not chrome.storage.local per comment:
@@ -38,6 +40,12 @@
   // different site at all. chrome.storage.local is shared across every
   // page this extension runs on, regardless of origin.
   let session = stored[SESSION_STORAGE_KEY] || null;
+  // Separate from session entirely, and never cleared by Clear Session:
+  // who's reviewing persists across every session, the same way the
+  // panel's own width does, since it's an identity fact rather than
+  // something scoped to one review.
+  let userName = stored[USER_STORAGE_KEY] || "";
+  let userEmail = stored[EMAIL_STORAGE_KEY] || "";
   // Every comment renders the same way (contenteditable text, camera
   // button only while it itself has focus and no screenshot yet) - there's
   // no separate "active" comment concept or state to track, since
@@ -78,6 +86,18 @@
   function scheduleSave() {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(saveSession, 400);
+  }
+
+  let userSaveTimer = null;
+  function scheduleUserInfoSave() {
+    clearTimeout(userSaveTimer);
+    userSaveTimer = setTimeout(() => {
+      chrome.storage.local.set({ [USER_STORAGE_KEY]: userName, [EMAIL_STORAGE_KEY]: userEmail });
+    }, 400);
+  }
+
+  function ensureSession() {
+    if (!session) session = { startedAt: Date.now(), pages: {}, details: "" };
   }
 
   html.dataset.alanReviewToolPrevWidth = html.style.width;
@@ -216,7 +236,7 @@
   }
 
   function handleNewComment() {
-    if (!session) session = { startedAt: Date.now(), pages: {} };
+    ensureSession();
     const key = currentPageKey();
     if (!session.pages[key]) session.pages[key] = [];
     const comment = { id: Date.now(), text: "", screenshot: null };
@@ -245,7 +265,7 @@
         render();
         return;
       }
-      if (!session) session = { startedAt: Date.now(), pages: {} };
+      ensureSession();
       const key = currentPageKey();
       if (!session.pages[key]) session.pages[key] = [];
       const comment = { id: Date.now(), text: "", screenshot: result.dataUrl };
@@ -378,11 +398,50 @@
 
   shadow.addEventListener("input", (event) => {
     const textEl = event.target.closest(".comment-text");
-    if (!textEl) return;
-    const comment = getPageComments().find((c) => String(c.id) === textEl.dataset.id);
-    if (comment) {
-      comment.text = getTextWithLineBreaks(textEl);
+    if (textEl) {
+      const comment = getPageComments().find((c) => String(c.id) === textEl.dataset.id);
+      if (comment) {
+        comment.text = getTextWithLineBreaks(textEl);
+        scheduleSave();
+      }
+      return;
+    }
+
+    if (event.target.id === "user-name-input") {
+      userName = event.target.value;
+      scheduleUserInfoSave();
+      return;
+    }
+
+    if (event.target.id === "user-email-input") {
+      userEmail = event.target.value;
+      scheduleUserInfoSave();
+      return;
+    }
+
+    if (event.target.id === "session-details") {
+      // The FIRST keystroke into details with no session yet silently
+      // created one behind the Clear Session/Download buttons' backs -
+      // their disabled attribute (and the "No active session yet" text)
+      // was set at the last render(), which happened before a session
+      // existed, and nothing here was updating it since typing
+      // deliberately skips render() to preserve focus. A full render()
+      // only on this one-time null-to-existing transition, refocusing
+      // afterward, fixes it without re-rendering on every keystroke.
+      const isNewSession = !session;
+      ensureSession();
+      session.details = event.target.value;
       scheduleSave();
+      if (isNewSession) {
+        render();
+        const detailsEl = shadow.getElementById("session-details");
+        if (detailsEl) {
+          detailsEl.focus();
+          detailsEl.setSelectionRange(detailsEl.value.length, detailsEl.value.length);
+        }
+      } else {
+        autoGrowTextarea(event.target);
+      }
     }
   });
 
@@ -433,7 +492,7 @@ ${pagesHtml}
   function renderComment(comment) {
     return `
       <div class="comment-item">
-        <button class="delete-comment" type="button" data-id="${comment.id}" title="Delete this comment">×</button>
+        <button class="delete-comment round-btn round-btn-red" type="button" data-id="${comment.id}" title="Delete this comment">×</button>
         <div class="comment-text" data-id="${comment.id}" contenteditable="true">${escapeHtml(comment.text)}</div>
         ${
           comment.screenshot
@@ -458,7 +517,7 @@ ${pagesHtml}
       <div class="panel">
         <div class="panel-header">
           <h2>Alan Review Tool</h2>
-          <button id="close" type="button">Close</button>
+          <button id="close" type="button" class="round-btn round-btn-grey" title="Close">×</button>
         </div>
 
         <div class="session-info">
@@ -469,6 +528,15 @@ ${pagesHtml}
                    <p>${totalCount} comment${totalCount === 1 ? "" : "s"}</p>`
                 : `<p>No active session yet</p>`
             }
+            <label class="field-row">
+              <span>User:</span>
+              <input type="text" id="user-name-input" value="${escapeHtml(userName)}" placeholder="Your name" />
+            </label>
+            <label class="field-row">
+              <span>Email:</span>
+              <input type="text" id="user-email-input" value="${escapeHtml(userEmail)}" placeholder="you@example.com" />
+            </label>
+            <textarea id="session-details" placeholder="Session details (what's being reviewed, context, etc.)">${escapeHtml(session?.details || "")}</textarea>
           </div>
           <div class="session-actions">
             <button id="clear-session" type="button" ${session ? "" : "disabled"}>Clear Session</button>
@@ -493,6 +561,18 @@ ${pagesHtml}
       </div>
     `;
     wireEvents();
+
+    // Sized here too, not just on input: a render() can rebuild this
+    // textarea around existing multi-line content (e.g. right after
+    // Clear Session resets it), and it should already be grown to fit
+    // rather than waiting for the next keystroke.
+    const detailsEl = shadow.getElementById("session-details");
+    if (detailsEl) autoGrowTextarea(detailsEl);
+  }
+
+  function autoGrowTextarea(el) {
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
   }
 
   function wireEvents() {
