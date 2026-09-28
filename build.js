@@ -15,6 +15,7 @@ const INLINES = [
     file: "ai-report-instructions.txt",
     placeholder: '"__AI_INSTRUCTIONS_PLACEHOLDER__"',
   },
+  { file: "help.html", placeholder: '"__HELP_HTML_PLACEHOLDER__"' },
 ];
 
 const SHARED_FILES = [
@@ -34,6 +35,16 @@ const inlineLiterals = INLINES.map(({ file, placeholder }) => ({
   placeholder,
   literal: JSON.stringify(fs.readFileSync(path.join(SRC, file), "utf8")),
 }));
+
+// The version shown in the panel comes from package.json, not a hand-copied
+// string - one source of truth, same inlining mechanism as everything else.
+const { version } = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "package.json"), "utf8"),
+);
+inlineLiterals.push({
+  placeholder: '"__VERSION_PLACEHOLDER__"',
+  literal: JSON.stringify(version),
+});
 
 for (const [browser, manifestFile] of Object.entries(TARGETS)) {
   const outDir = path.join(DIST, browser);

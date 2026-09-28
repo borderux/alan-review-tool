@@ -3,7 +3,8 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "build": "node build.js",
+    "build": "npm run lint && node build.js",
+    "package-extension": "node scripts/package-extension.mjs",
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{js,json,md,css}\"",
     "prepare": "node .husky/install.mjs",
@@ -11,8 +12,9 @@
     "release": "changeset publish"
   },
   "devDependencies": {
-    "@changesets/cli": "^3.0.3",
+    "@changesets/cli": "^2.29.7",
     "@eslint/js": "^10.0.1",
+    "archiver": "^7.0.1",
     "eslint": "^10.11.0",
     "globals": "^17.12.0",
     "husky": "^9.1.7",

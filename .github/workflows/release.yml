@@ -1,21 +1,22 @@
 # Release Workflow
 #
-# This repo is a private, unpublished browser extension (no npm registry
-# publish, no Turborepo, no build-artifact upload) - so unlike the standard
-# @recursica package release workflow this is based on, there's nothing for
-# `npm run release` (`changeset publish`) to actually publish. Changesets
-# skips publishing for any package marked "private": true automatically, so
-# that step safely no-ops. What still matters, and is why this workflow
-# exists at all: Changesets versions package.json, writes CHANGELOG.md, and
-# opens/updates a "Version Packages" PR whenever a changeset lands on main -
-# that's the actual release-tracking value here, publish or not.
+# This repo is a private, unpublished browser extension - no npm registry
+# publish, ever. Changesets normally skips both versioning and tagging for
+# any package marked "private": true, but .changeset/config.json sets
+# privatePackages: { version: true, tag: true } (the same setting our other
+# private packages use), which tells it to still bump the version, write
+# CHANGELOG.md, and create a git tag/GitHub Release - it just never attempts
+# an actual `npm publish`. `npm run release` (`changeset publish`) reports
+# "no unpublished projects" for the private-publish part and that's expected,
+# not a failure.
 #
 # How it works:
 # 1. Triggers on changes to .changeset/, src/, or package files on main
 # 2. Uses Changesets to detect whether there's a version bump pending
 # 3. If changesets are present, opens/updates a "Version Packages" PR
-# 4. When that PR is merged, runs `npm run release` (a no-op publish, since
-#    this package is private) and tags the release
+# 4. When that PR is merged, changesets/action tags + creates the GitHub
+#    Release (from privatePackages.tag), then this workflow zips both
+#    dist/chrome and dist/firefox and uploads them as assets on that release
 
 name: Release
 
@@ -35,7 +36,7 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     permissions:
-      contents: write # To create releases and tags
+      contents: write # To create releases, tags, and upload release assets
       pull-requests: write # To create pull requests
     steps:
       - name: Checkout
@@ -55,8 +56,7 @@ jobs:
           HUSKY: 0
 
       # Build before releasing so a broken build blocks the release the same
-      # way it blocks a PR, and so dist/ is current if it's ever attached to
-      # a GitHub release by hand later.
+      # way it blocks a PR, and so dist/ is current for packaging below.
       - name: Build
         run: npm run build
 
@@ -64,14 +64,23 @@ jobs:
       #
       # This action has two modes:
       # 1. If changesets are present, it creates a "Version Packages" pull request.
-      # 2. When the "Version Packages" PR is merged, it runs the `publish` command.
-      #
-      # The `publish` command executes `npm run release` (`changeset publish`) -
-      # since this package is private, Changesets skips the actual publish step
-      # but still tags the release and lets this action create the GitHub release.
-      - name: Create Release Pull Request or Publish to npm
+      # 2. When the "Version Packages" PR is merged, it runs the `publish` command,
+      #    tags the release, and creates the GitHub Release (privatePackages.tag).
+      - name: Create Release Pull Request or Tag Release
+        id: changesets
         uses: changesets/action@v1
         with:
           publish: npm run release
+
+      # Only runs once the Version Packages PR is merged and a release was
+      # actually tagged this run - not on every push to main, and not on the
+      # runs that only open/update that PR.
+      - name: Package extension zips
+        if: steps.changesets.outputs.published == 'true'
+        run: npm run package-extension
+
+      - name: Upload release assets
+        if: steps.changesets.outputs.published == 'true'
+        run: gh release upload "v$(node -p "require('./package.json').version")" release-zips/*.zip --clobber
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
