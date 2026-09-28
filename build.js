@@ -1,78 +1,53 @@
 const fs = require("fs");
 const path = require("path");
 
-const SRC = path.join(__dirname, "src");
-const DIST = path.join(__dirname, "dist");
+const ROOT = __dirname;
+const SRC = path.join(ROOT, "src");
+const DIST = path.join(ROOT, "dist");
+// Vite writes the bundled panel here first; it is then copied, unchanged,
+// into each browser's folder.
+const CONTENT_OUT = path.join(DIST, ".content", "content.js");
 
-// Some source files exist only to be inlined into content.js's generated
-// report at build time (a downloaded standalone HTML file can't fetch a
-// sibling file) - kept as their own real, lintable source files instead of
-// hand-maintained strings inside content.js, and inlined here via a
-// placeholder-token swap.
-const INLINES = [
-  { file: "report.css", placeholder: '"__REPORT_CSS_PLACEHOLDER__"' },
-  {
-    file: "ai-report-instructions.txt",
-    placeholder: '"__AI_INSTRUCTIONS_PLACEHOLDER__"',
-  },
-  { file: "help.html", placeholder: '"__HELP_HTML_PLACEHOLDER__"' },
-];
-
-const SHARED_FILES = [
-  "background.js",
-  "content.js",
-  "content.css",
-  "alan-logo.png",
-];
+// Copied as-is. content.js is not in this list - it is Vite's output.
+const SHARED_FILES = ["background.js", "alan-logo.png"];
 const TARGETS = {
   chrome: "manifest.chrome.json",
   firefox: "manifest.firefox.json",
 };
 
-fs.rmSync(DIST, { recursive: true, force: true });
+async function main() {
+  fs.rmSync(DIST, { recursive: true, force: true });
 
-const inlineLiterals = INLINES.map(({ file, placeholder }) => ({
-  placeholder,
-  literal: JSON.stringify(fs.readFileSync(path.join(SRC, file), "utf8")),
-}));
+  // Vite is ESM-only; this script stays CommonJS so it keeps working
+  // without "type": "module" in package.json.
+  const { build } = await import("vite");
+  await build({
+    configFile: path.join(ROOT, "vite.config.mts"),
+    logLevel: "warn",
+  });
 
-// The version shown in the panel comes from package.json, not a hand-copied
-// string - one source of truth, same inlining mechanism as everything else.
-const { version } = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "package.json"), "utf8"),
-);
-inlineLiterals.push({
-  placeholder: '"__VERSION_PLACEHOLDER__"',
-  literal: JSON.stringify(version),
-});
-
-for (const [browser, manifestFile] of Object.entries(TARGETS)) {
-  const outDir = path.join(DIST, browser);
-  fs.mkdirSync(outDir, { recursive: true });
-
-  for (const file of SHARED_FILES) {
-    const srcPath = path.join(SRC, file);
-    const outPath = path.join(outDir, file);
-    if (file === "content.js") {
-      let content = fs.readFileSync(srcPath, "utf8");
-      for (const { placeholder, literal } of inlineLiterals) {
-        if (!content.includes(placeholder)) {
-          throw new Error(
-            `content.js is missing the ${placeholder} placeholder - a source file can't be inlined`,
-          );
-        }
-        content = content.replace(placeholder, literal);
-      }
-      fs.writeFileSync(outPath, content);
-    } else {
-      fs.copyFileSync(srcPath, outPath);
-    }
+  if (!fs.existsSync(CONTENT_OUT)) {
+    throw new Error(`Vite did not produce ${CONTENT_OUT}`);
   }
 
-  fs.copyFileSync(
-    path.join(SRC, manifestFile),
-    path.join(outDir, "manifest.json"),
-  );
+  for (const [browser, manifestFile] of Object.entries(TARGETS)) {
+    const outDir = path.join(DIST, browser);
+    fs.mkdirSync(outDir, { recursive: true });
+    for (const file of SHARED_FILES) {
+      fs.copyFileSync(path.join(SRC, file), path.join(outDir, file));
+    }
+    fs.copyFileSync(CONTENT_OUT, path.join(outDir, "content.js"));
+    fs.copyFileSync(
+      path.join(SRC, manifestFile),
+      path.join(outDir, "manifest.json"),
+    );
+  }
+
+  fs.rmSync(path.join(DIST, ".content"), { recursive: true, force: true });
+  console.log("Built extension bundles into dist/chrome and dist/firefox");
 }
 
-console.log("Built extension bundles into dist/chrome and dist/firefox");
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

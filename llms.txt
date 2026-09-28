@@ -4,16 +4,18 @@
 > feedback on any website - text comments and screenshots, organized into a
 > session, exported as a self-contained HTML report.
 
-No backend, no bundler, no site-side integration required - a reviewer
-clicks the toolbar icon on any tab and a slide-out panel appears.
+No backend and no site-side integration required - a reviewer clicks the
+toolbar icon on any tab and a slide-out panel appears. The panel is React +
+TypeScript on the Recursica design system, bundled by Vite.
 
 ## Reference documentation
 
 - [README](README.md): What this is, how to build it, how to load it in
   Chrome/Firefox, and the local development scripts.
 - [ARCHITECTURE](ARCHITECTURE.md): Injection/lifecycle model, the storage
-  data model, the report format, the build's file-inlining mechanism, and
-  the migration discipline required for any data-shape change.
+  shadow-root styling model, the storage data model, the report format,
+  the build, and the migration discipline required for any data-shape
+  change.
 - [AGENTS](AGENTS.md): Rules for AI agents making changes to this codebase -
   read this and ARCHITECTURE.md before planning a change.
 
@@ -23,19 +25,21 @@ clicks the toolbar icon on any tab and a slide-out panel appears.
   manifests. Differ only in their `background` block.
 - `src/background.js` - Service worker: injects `content.js` on toolbar
   click, captures screenshots on request from the content script.
-- `src/content.js` - The entire panel: rendering, session/comment state,
-  screenshot capture and cyan-annotation lightbox, and the downloaded
-  report's HTML generation. Re-injected fresh on every toolbar click.
-- `src/content.css` - Styles the live panel (loaded via `<link>` inside its
-  shadow root).
+- `src/content/` - The panel (React + TypeScript): entry and mount,
+  components, session state, screenshot capture, and the downloaded
+  report's HTML generation (`lib/report.ts`). Bundled into `content.js`
+  and re-injected fresh on every toolbar click.
 - `src/report.css` - Styles the downloaded report only. Inlined into
   `content.js` at build time, not loaded at runtime.
 - `src/ai-report-instructions.txt` - Hidden, AI-readable instructions
-  explaining the report's structure, also inlined into `content.js` at
-  build time.
-- `build.js` - Copies the shared files into `dist/chrome` and
-  `dist/firefox`, pairs each with its own manifest, and performs the
-  report.css/ai-report-instructions.txt inlining step.
+  explaining the report's structure, also inlined at build time.
+- `vite.config.mts` - Bundles the panel into one classic-script
+  `content.js`, and scopes every stylesheet to the panel's shadow root.
+- `build.js` - Runs the Vite build, then copies `content.js`,
+  `background.js` and the logo into `dist/chrome` and `dist/firefox`,
+  pairing each with its own manifest.
+- `tsconfig.json`, `tsconfig.node.json` - Type checking for the panel and
+  for the Vite config.
 - `dist/` - Build output (git-ignored). Load `dist/chrome` or
   `dist/firefox` as an unpacked/temporary extension to run it.
 - `.changeset/` - Changesets config; this package is private and never

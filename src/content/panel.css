@@ -1,0 +1,106 @@
+/* The panel's own rules. Deliberately few: everything visual comes from
+   Recursica components and the theme. What remains is layout for elements
+   that no component covers - each one is listed as a gap in the pull
+   request that introduced it. */
+
+/* The shadow root's top element. `:root` in Mantine's and the theme's
+   stylesheets is rewritten to this class at build time. The base font
+   comes from the brand's primary typeface token, so anything the design
+   system does not paint itself inherits it. */
+.art-root {
+  height: 100%;
+  font-family: var(--recursica_brand_fonts_primary);
+}
+
+/* Approved exception: the user-resizable panel width. The kit's panel has
+   no resize affordance, so this strip is hand-built. It is a real,
+   focusable separator; arrow keys resize it as the non-drag alternative. */
+.art-resizer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 6px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 1000;
+  background: transparent;
+}
+.art-resizer:focus-visible {
+  outline: auto;
+}
+
+/* Where tooltips and modals render. Mantine's modal positions itself as
+   position: fixed with no left offset, which relies on sitting at the
+   viewport's left edge - true in document.body, where Mantine normally
+   portals, but not inside the panel's host on the right. Pinning the
+   portal container to the viewport's top-left corner restores that.
+   Being fixed, it is also its own stacking context, so it sits above the
+   panel (and its resize strip): a modal's backdrop must cover the panel,
+   and a tooltip must never render underneath it. */
+.art-portal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1001;
+}
+
+/* The logo beside the panel title. No image component exists in the kit. */
+.art-logo {
+  display: block;
+  height: 32px;
+  width: auto;
+  flex-shrink: 0;
+}
+
+/* A comment's screenshot thumbnail. No image or thumbnail component
+   exists in the kit. */
+.art-thumb {
+  display: block;
+  width: 64px;
+  height: 48px;
+  object-fit: cover;
+}
+
+/* The screenshot and its drawing layer inside the screenshot modal. The
+   canvas sits exactly over the image, in the image's own natural-
+   resolution coordinate space. */
+.art-shot {
+  position: relative;
+  display: inline-block;
+  /* Shrink to the image inside the modal's column layout, so the drawing
+     layer covers the image exactly and nothing beside it. */
+  align-self: flex-start;
+  line-height: 0;
+  max-width: 100%;
+}
+.art-shot img {
+  display: block;
+  max-width: 100%;
+  max-height: 60vh;
+}
+.art-shot canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+/* Where a toast appears: over the page, at its bottom-left, so it never
+   changes the height of anything. Not inside the panel: the theme's toast
+   min-width (384px) is wider than the panel itself. The kit's Toast has
+   no host or placement of its own; the offsets come from the theme's
+   spacing token rather than a hand-set value. */
+.art-toast-anchor {
+  position: fixed;
+  left: var(--recursica_brand_dimensions_general_xl);
+  bottom: var(--recursica_brand_dimensions_general_xl);
+}
+
+/* A list with no markers, for the comment list. */
+.art-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}

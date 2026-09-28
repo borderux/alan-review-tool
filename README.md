@@ -16,8 +16,12 @@ JavaScript in what you export.
   of the page, then draw directly on the captured image (cyan, 3px) to
   point at the specific thing you mean. Annotations bake permanently into
   the image once you dismiss the lightbox.
-- **Resizable panel** that remembers its width, and reviewer identity
-  (name/email) that persists across sessions.
+- **Built on the Recursica design system** (React, TypeScript and the
+  Recursica Mantine adapter, with the default Recursica Forge theme), in
+  light or dark mode following your operating system.
+- **Resizable panel** that remembers its width (drag the left edge, or
+  focus it and use the arrow keys), and reviewer identity (name/email)
+  that persists across sessions.
 - **Exports a single, self-contained HTML report** — header, table of
   contents, one section per page, tight comment list, 50×50 thumbnails
   with a full-resolution lightbox. The lightbox is pure CSS (`:target`,
@@ -37,19 +41,23 @@ and [llms.txt](llms.txt) for a quick map of the repo's layout.
 
     npm run build
 
-Writes browser-specific bundles to `dist/chrome` and `dist/firefox`. Two
-manifests are needed because Chrome's MV3 requires a `service_worker`
-background and Firefox's MV3 still wants `background.scripts` — everything
-else (`background.js`, `content.js`) is shared, unmodified, between both.
+Runs lint and the type check, bundles the panel with Vite into a single
+`content.js`, and writes browser-specific bundles to `dist/chrome` and
+`dist/firefox`. Two manifests are needed because Chrome's MV3 requires a
+`service_worker` background and Firefox's MV3 still wants
+`background.scripts` — everything else (`background.js`, `content.js`) is
+shared, unmodified, between both.
 
 ## Development
 
     npm install
-    npm run lint
+    npm run lint        # ESLint, then the TypeScript type check
+    npm run typecheck   # the type check alone
     npm run format
 
-`npm install` also wires up a Husky pre-commit hook (via `prepare`) that runs
-Prettier and ESLint on staged files. Releases are tracked with
+The panel lives in `src/content/` (React + TypeScript). `npm install` also
+wires up a Husky pre-commit hook (via `prepare`) that runs Prettier, ESLint
+and the type check on staged files. Releases are tracked with
 [Changesets](https://github.com/changesets/changesets) — run `npx changeset`
 to record a change, which lands in `CHANGELOG.md` and a version bump the next
 time the release workflow runs on `main`. This package is private and never
