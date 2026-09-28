@@ -25,9 +25,6 @@ jobs:
         env:
           # This prevents husky from installing git hooks during the CI process
           HUSKY: 0
-
-      - name: Lint
-        run: npm run lint
-
+          
       - name: Build
         run: npm run build

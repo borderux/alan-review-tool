@@ -71,8 +71,6 @@ jobs:
         uses: changesets/action@v1
         with:
           publish: npm run release
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
 
       # Only runs once the Version Packages PR is merged and a release was
       # actually tagged this run - not on every push to main, and not on the

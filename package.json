@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "build": "node build.js",
+    "build": "npm run lint && node build.js",
     "package-extension": "node scripts/package-extension.mjs",
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{js,json,md,css}\"",
