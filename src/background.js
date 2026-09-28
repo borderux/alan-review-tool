@@ -5,6 +5,10 @@ chrome.action.onClicked.addListener(async (tab) => {
       target: { tabId: tab.id },
       files: ["content.js"],
     });
+    // A tab that once failed (e.g. a restricted page) and later succeeds
+    // (e.g. after navigating to a real site) would otherwise keep showing
+    // the red badge forever - nothing else ever clears it.
+    await chrome.action.setBadgeText({ tabId: tab.id, text: "" });
   } catch (err) {
     // chrome://, the Web Store, and the PDF viewer refuse injection even with
     // activeTab — surface that instead of failing silently on click.
