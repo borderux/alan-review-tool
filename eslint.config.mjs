@@ -5,7 +5,7 @@ import js from "@eslint/js";
 import globals from "globals";
 
 export default [
-  { ignores: ["dist/**", "node_modules/**"] },
+  { ignores: ["dist/**", "node_modules/**", "release-zips/**"] },
   {
     // The injected panel and its report-building code - runs in a page's
     // own browser context, plus the chrome.* extension APIs.
@@ -38,9 +38,10 @@ export default [
     rules: js.configs.recommended.rules,
   },
   {
-    // This config file itself - real ESM (import/export), unlike the rest
-    // of this plain-JS, no-bundler project.
-    files: ["eslint.config.mjs"],
+    // This config file and the release-packaging script - real ESM
+    // (import/export), unlike the rest of this plain-JS, no-bundler
+    // project.
+    files: ["eslint.config.mjs", "scripts/**/*.mjs"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",
