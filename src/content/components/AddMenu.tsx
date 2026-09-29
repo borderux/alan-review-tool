@@ -4,18 +4,24 @@ import { useManagedMenu } from "./useManagedMenu";
 
 interface AddMenuProps {
   busy: boolean;
+  // Off when saved data could not be loaded; describedBy then points at
+  // the message in the panel body that says why.
+  disabled: boolean;
+  describedBy?: string;
   onAddComment: () => void;
   onAddScreenshot: () => void;
   onAddElement: () => void;
 }
 
 // The one add control, in the panel header to the left of the title: a
-// large, icon-only, outline button (an approved exception to "every panel
-// button is small") that opens a menu - Comment, Screenshot, Element. Each
+// small, icon-only, outline button that opens a menu - Comment,
+// Screenshot, Element. Each
 // item creates a new numbered comment at the top of the list, with focus in
 // its text box; a cancelled capture returns focus here.
 export function AddMenu({
   busy,
+  disabled,
+  describedBy,
   onAddComment,
   onAddScreenshot,
   onAddElement,
@@ -29,8 +35,11 @@ export function AddMenu({
           <Button
             ref={triggerRef}
             variant="outline"
+            size="small"
             icon={<Plus />}
             aria-label="Add"
+            aria-describedby={describedBy}
+            disabled={disabled}
             loading={busy}
             data-add-menu="true"
           />

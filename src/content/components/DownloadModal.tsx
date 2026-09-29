@@ -24,8 +24,8 @@ interface DownloadModalProps {
   onDownload: (values: ReportDetails) => void;
 }
 
-// Opens every time Download report is clicked: the reviewer's details for
-// the report, prefilled with what was saved last time. Download report (the
+// Opens every time Download comments is clicked: the reviewer's details for
+// the report, prefilled with what was saved last time. Download comments (the
 // one solid button) saves them and downloads; Cancel changes nothing.
 // Rendered on layer 1, like every modal.
 export function DownloadModal({
@@ -47,7 +47,7 @@ export function DownloadModal({
     <Modal
       opened
       onClose={onCancel}
-      title="Download report"
+      title="Download comments"
       portalProps={{ target }}
       // Focus return is done by the panel: inside a shadow root, Mantine
       // records the host element as the trigger.
@@ -120,7 +120,7 @@ export function DownloadModal({
             });
           }}
         >
-          Download report
+          Download comments
         </Button>
       </Modal.Footer>
     </Modal>

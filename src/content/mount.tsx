@@ -2,7 +2,11 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { registerFonts } from "./fonts";
 import { HOST_ID, pushPage, restorePage } from "./lib/page";
-import { loadStoredState } from "./lib/storage";
+import {
+  FAILED_LOAD_STATE,
+  loadStoredState,
+  type StoredState,
+} from "./lib/storage";
 import { PANEL_CSS } from "./styles";
 import { initialScheme } from "./useColorScheme";
 
@@ -10,7 +14,17 @@ import { initialScheme } from "./useColorScheme";
 const PANEL_ROOT_CLASS = "art-root";
 
 export async function mountPanel(): Promise<void> {
-  const stored = await loadStoredState();
+  // If storage can't be read, the panel still opens - empty, with Add
+  // disabled and a message saying the saved data could not be loaded -
+  // rather than the toolbar click doing nothing at all. No retry: the next
+  // toolbar click tries again.
+  let stored: StoredState;
+  try {
+    stored = await loadStoredState();
+  } catch (err) {
+    console.error("Snippy: could not load saved data.", err);
+    stored = FAILED_LOAD_STATE;
+  }
   // Whatever had focus on the page before the panel opened gets it back
   // when the panel closes; the toolbar button that opened it can't.
   const previousFocus = document.activeElement;

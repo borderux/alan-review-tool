@@ -13,8 +13,12 @@ JavaScript in what you export.
 - **Comments and screenshots**, grouped into a single review **session**
   that spans every page visited, not scoped to one tab or one origin.
 - **One Add menu** — the plus button in the panel header offers Comment,
-  Screenshot or Element. Each creates a new numbered comment at the top of
-  the list, with focus in its text box.
+  Screenshot or Element. Each creates a new numbered comment card at the
+  top of the list, with focus in its text box.
+- **This page only, or every page** — a switch above the list shows just
+  the current page's comments (the default) or every page's, grouped under
+  page headings. A second switch, Show images, hides the screenshots in
+  the panel (never in the report). Both are remembered.
 - **Screenshot capture with freehand annotation** — drag-select any region
   of the page, then use Add annotations to draw on it, choosing one of six
   pen colors from a dropdown (red by default; the last choice is
@@ -30,16 +34,21 @@ JavaScript in what you export.
   Recursica Mantine adapter, with the default Recursica Forge theme), in
   light or dark mode following your operating system.
 - **Resizable panel** that remembers its width (drag the left edge, or
-  focus it and use the arrow keys). Download report asks for the
+  focus it and use the arrow keys). Download comments (with the number
+  of comments across every page) asks for the
   reviewer's name, email and session details each time, prefilled with
   the last values used.
 - **Exports a single, self-contained HTML report** — header, table of
   contents, one section per page, tight comment list, 50×50 thumbnails
   with a full-resolution lightbox. The lightbox is pure CSS (`:target`,
   no JavaScript at all); the whole report has zero `<script>` tags.
-- **Every comment gets a permanent, never-reused number** (1, 2, 3), and
-  every session gets its own hidden guid — combine the two for a globally
-  unique id per piece of feedback.
+- **Comments are numbered 1 to N** across the session, in the order they
+  were made, with no gaps — deleting one renumbers the rest. Every session
+  also gets its own hidden guid, which with a comment's number identifies
+  that comment within one report.
+- **Asks before anything that can't be undone** — deleting a comment,
+  Start over, and in the annotation editor, deleting the screenshot,
+  clearing annotations or closing with an unsaved drawing.
 - **Recursica versions of the reviewed page** — when a page is built with
   Recursica, the report says so per page, with the Forge theme version
   (when the page's theme stylesheet still carries its header comment), the

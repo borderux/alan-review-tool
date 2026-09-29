@@ -128,8 +128,10 @@ export function buildReportHtml({
               `<a href="#_" id="${shotId}" class="lightbox"><img src="${comment.screenshot}" alt="Screenshot" /></a>`,
             );
           }
-          // The comment number plus the hidden session guid (in the head,
-          // once) together make a globally unique id per comment.
+          // The comment number is its position, 1 to N across the session.
+          // With the hidden session guid (in the head, once) it identifies
+          // a comment within this one report - not across reports, since
+          // a delete renumbers the comments after it.
           const hasNumber = comment.commentNumber != null;
           const commentId = hasNumber
             ? formatCommentId(comment.commentNumber)

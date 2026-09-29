@@ -35,16 +35,23 @@ Recursica design system and bundled by Vite into one content script;
   - `App.tsx` - the Mantine provider, configured for the shadow root, and
     the Recursica layer-0 scope.
   - `ReviewPanel.tsx` - the panel shell: open/close, Escape, focus, the
-    footer (Start over, Download report), toast and modals.
-  - `components/` - the one view (`CommentList`, the comment list), the
-    Add menu (`AddMenu`: a large icon-only plus button in the panel header,
-    left of the title, rendered into a slot placed first in the header -
-    Comment, Screenshot, Element),
-    a comment row with its action menu, the download modal (reviewer
-    name, email and session details, every time a report is downloaded),
-    the annotation editor (a fixed toolbar with the pen color dropdown and
-    Clear annotations above a scrolling image area), the shared
-    confirmation modal, the resize strip,
+    footer (Start over, Download comments (n)), toast and modals, and the
+    failed-load state (storage could not be read: the panel opens empty,
+    Add disabled, with a message in its body).
+  - `components/` - the one view (`CommentList`: the current page's
+    comments, or every page's grouped under page headings), the view
+    switches (`ViewControls`: This page only, Show images - rendered into
+    a slot placed between the panel header and its scrolling body, so they
+    stay put), the Add menu (`AddMenu`: a small icon-only plus button in
+    the panel header, left of the title, rendered into a slot placed first
+    in the header - Comment, Screenshot, Element), a comment card
+    (`CommentItem`, the kit's Card) with its action menu, the download
+    modal (reviewer name, email and session details, every time comments
+    are downloaded), the annotation editor (a fixed toolbar with the pen
+    color dropdown and Clear annotations above a bordered, scrolling image
+    area; its own confirmations - discard drawing, clear annotations,
+    delete screenshot - stack on it), the shared confirmation modal, the
+    resize strip,
     and `useManagedMenu` (menu focus handling that works in a shadow root).
   - `useReviewSession.ts` - all session state and saving.
   - `modalPortal.ts` - hands every modal its layer-1 portal container.
@@ -193,7 +200,7 @@ defeat the entire "any site, one session" pitch.
 session = {
   startedAt: <timestamp>,
   guid: <uuid>,                 // see Report identity below
-  commentCounter: <int>,        // monotonic, never reused, never decreases
+  commentCounter: <int>,        // the number of comments, N (see below)
   details: <string>,            // freeform session notes
   pages: {
     "<origin+pathname+search>": {
@@ -214,8 +221,10 @@ session = {
 
 The types live in `src/content/lib/types.ts`. Reviewer identity
 (`snippyUser`, `snippyEmail`), the panel's width (`snippyPanelWidth`) and
-the annotation pen's last colour (`snippyPenColor`) are stored under
-**separate** keys and never cleared by "Start over" - they're
+the annotation pen's last colour (`snippyPenColor`) and the two view
+switches (`snippyPageOnly`, `snippyShowImages`, both on unless stored as
+`false`) are stored under **separate** keys and never cleared by "Start
+over" - they're
 identity/preference facts, not session data. The download modal edits
 them (and the session's details) each time a report is downloaded. An old
 `snippyDraft` / `taggerDraft` key, from when the panel had a New comment
@@ -263,9 +272,26 @@ and anything still pending is written when the panel closes. Saving is
 silent - the panel shows no save status, an approved exception to the
 autosave-status rule - but every write's promise is tracked, and a failed
 write (rarer now that `unlimitedStorage` lifts the quota, but a write can
-still fail) raises a toast with the browser's reason. Deleting a comment, a
-screenshot, or the whole session asks for confirmation first, in a modal
-on layer 1.
+still fail) raises a toast with the browser's reason. Every action that
+can't be undone asks first, in a modal on layer 1 (owner rule): deleting a
+comment or the whole session, and in the annotation editor, deleting the
+screenshot, clearing annotations, and closing with an unsaved drawing. The
+editor's confirmations stack on the editor, so Cancel returns to the
+drawing untouched.
+
+If storage can't be read at all, `mountPanel()` opens the panel anyway with
+`FAILED_LOAD_STATE`: nothing loaded, Add disabled, and a message in the
+panel body. With Add disabled no session can start, so the session that
+could not be read is never written over. No retry; the next toolbar click
+tries again.
+
+**Comment numbers are positions.** Every comment in the session is
+numbered 1 to N, across all pages, in creation order, with no gaps, and
+`commentCounter` is N. A new comment is N + 1; deleting one renumbers the
+rest (`renumberComments()` in `lib/storage.ts`), so a deleted number is not
+kept back. Sessions saved when numbers were never reused can have gaps, so
+`migrateSession()` renumbers on load, in the order of the old numbers
+(which was creation order). The stored shape is unchanged.
 
 **Schema changes require a migration.** Real users' `chrome.storage.local`
 persists across every version of this extension they've had installed -
@@ -290,9 +316,9 @@ rendered with React:
   the page (visible text omits query params for readability; the `href`
   always has the full URL).
 - **Comments**, tight and separated, each labelled "Comment <n>" with the
-  plain number in `data-comment-id`. The number comes from the session's
-  monotonic counter - assigned once at creation, however the comment is
-  created (Add menu, duplicate), and never reused even after a delete.
+  plain number in `data-comment-id`. The number is the comment's position,
+  1 to N across the session in creation order (see the Data model), so
+  it can change when an earlier comment is deleted.
   `formatCommentId` and `commentName` in `lib/ids.ts` are the one place a
   number becomes text, in the panel and the report alike. (Reports from
   before this wrote it as `CM-<n>`.)
@@ -344,8 +370,9 @@ collision:
   (falling back to `crypto.getRandomValues()` on plain `http://` pages,
   where `randomUUID()` isn't available). Written into the report as a hidden
   `<meta name="snippy-session-id">` - parsable, never rendered.
-- **The comment number** - one per comment, unique _within_ a session.
-  Combine the two for a globally unique id.
+- **The comment number** - one per comment, unique _within_ one report.
+  Combined with the guid it identifies a comment within that report only:
+  numbers are positions, and a delete renumbers the comments after it.
 
 The report's head also carries `<meta name="snippy-version">`, the
 extension version that produced it, for support. The panel itself shows no
@@ -353,7 +380,7 @@ version; the browser's extension details do.
 
 Sessions saved before either id existed get both backfilled on load by
 `migrateSession()`: a guid gets generated, and every existing comment gets
-numbered oldest-to-newest.
+numbered oldest-to-newest (then renumbered 1 to N, as for every session).
 
 ### AI-readable instructions
 

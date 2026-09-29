@@ -1,14 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { createPortal } from "react-dom";
-import { Button, Group, Panel, Toast } from "@recursica/adapter-mantine-v8";
+import {
+  Button,
+  Group,
+  Panel,
+  Text,
+  Toast,
+} from "@recursica/adapter-mantine-v8";
 import { AddMenu } from "./components/AddMenu";
 import { AnnotationEditor } from "./components/AnnotationEditor";
-import { CommentList, type CaptureTarget } from "./components/CommentList";
+import {
+  CommentList,
+  type CaptureTarget,
+  type PageGroup,
+} from "./components/CommentList";
 import { ConfirmModal } from "./components/ConfirmModal";
 import { DownloadModal, type ReportDetails } from "./components/DownloadModal";
 import { ResizeHandle } from "./components/ResizeHandle";
+import { ViewControls } from "./components/ViewControls";
 import { captureElement, captureRegion } from "./lib/capture";
+import { formatCount, plural } from "./lib/format";
 import { commentName } from "./lib/ids";
 import { detectRecursica } from "./lib/recursica";
 import {
@@ -20,7 +32,13 @@ import {
   setHostWidth,
 } from "./lib/page";
 import { downloadReport, totalCommentCount } from "./lib/report";
-import { savePenColor, type PenColor, type StoredState } from "./lib/storage";
+import {
+  savePageOnly,
+  savePenColor,
+  saveShowImages,
+  type PenColor,
+  type StoredState,
+} from "./lib/storage";
 import type { ReviewComment } from "./lib/types";
 import { usePageKey } from "./usePageKey";
 import { useReviewSession } from "./useReviewSession";
@@ -39,11 +57,15 @@ export function fieldLayout(formLayout: FormLayout) {
   return { formLayout, labelAlignment: "left" } as const;
 }
 
-// The one confirmation that can be open, if any.
+// The one panel confirmation that can be open, if any. (The annotation
+// editor asks its own questions, stacked on the editor.)
 type Confirmation =
-  | { kind: "delete-comment"; comment: ReviewComment }
-  | { kind: "delete-screenshot"; comment: ReviewComment }
+  | { kind: "delete-comment"; pageKey: string; comment: ReviewComment }
   | { kind: "start-over" };
+
+// The id of the element holding the failed-load message, which is also
+// the disabled Add button's description.
+const LOAD_ERROR_ID = "art-load-error";
 
 interface ReviewPanelProps {
   host: HTMLElement;
@@ -71,11 +93,21 @@ export function ReviewPanel({
   const [opened, setOpened] = useState(false);
   const [width, setWidth] = useState(stored.width);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
-  const [annotateId, setAnnotateId] = useState<number | null>(null);
+  // The comment whose screenshot is open in the annotation editor.
+  const [annotating, setAnnotating] = useState<{
+    pageKey: string;
+    id: number;
+  } | null>(null);
   const [downloadOpen, setDownloadOpen] = useState(false);
   // Where the Add menu renders: a slot at the start of the panel header,
   // before the title (see below).
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
+  // Where the view switches render: a slot between the panel header and
+  // its scrolling body (see below).
+  const [viewSlot, setViewSlot] = useState<HTMLElement | null>(null);
+  const [pageOnly, setPageOnly] = useState(stored.pageOnly);
+  const [showImages, setShowImages] = useState(stored.showImages);
+  const loadFailed = Boolean(stored.loadFailed);
   const [penColor, setPenColor] = useState<PenColor>(stored.penColor);
   const [focusId, setFocusId] = useState<number | null>(null);
   const [captureTarget, setCaptureTarget] = useState<CaptureTarget>(null);
@@ -86,12 +118,42 @@ export function ReviewPanel({
   const capturing = useRef(false);
 
   const pageKey = usePageKey();
-  const pageComments = session?.pages[pageKey]?.comments ?? [];
   const total = totalCommentCount(session);
   const annotateComment =
-    annotateId == null
+    annotating == null
       ? null
-      : (pageComments.find((c) => c.id === annotateId) ?? null);
+      : (session?.pages[annotating.pageKey]?.comments.find(
+          (c) => c.id === annotating.id,
+        ) ?? null);
+
+  // What the list shows. This page only: the current page's comments.
+  // Otherwise every page's, grouped by page: the current page first, then
+  // the others, most recently commented first (a comment's id is its
+  // creation time).
+  const currentGroup: PageGroup = {
+    pageKey,
+    title: session?.pages[pageKey]?.title ?? document.title,
+    comments: session?.pages[pageKey]?.comments ?? [],
+    current: true,
+  };
+  const groups: PageGroup[] = pageOnly
+    ? [currentGroup]
+    : [
+        currentGroup,
+        ...Object.entries(session?.pages ?? {})
+          .filter(([key, page]) => key !== pageKey && page.comments.length > 0)
+          .map(([key, page]) => ({
+            pageKey: key,
+            title: page.title,
+            comments: page.comments,
+            current: false,
+          }))
+          .sort(
+            (a, b) =>
+              Math.max(...b.comments.map((c) => c.id)) -
+              Math.max(...a.comments.map((c) => c.id)),
+          ),
+      ];
   const formLayout: FormLayout = "stacked";
 
   // Slide in after the first paint, so the open is a transition.
@@ -123,10 +185,27 @@ export function ReviewPanel({
     };
   }, [host]);
 
+  // The view switches sit between the panel header and its body, outside
+  // the part that scrolls, so they stay put while the list scrolls. The
+  // kit's panel has no slot for that either (a reported gap), so one is
+  // placed right after the header.
+  useEffect(() => {
+    const header = findInPanel(host, ".mantine-Drawer-header");
+    if (!header) return;
+    const slot = document.createElement("div");
+    slot.className = "art-view-slot";
+    header.after(slot);
+    const frame = requestAnimationFrame(() => setViewSlot(slot));
+    return () => {
+      cancelAnimationFrame(frame);
+      slot.remove();
+    };
+  }, [host]);
+
   // While a modal is open, everything behind it is inert - the host page
   // and the panel itself - so a screen reader's reading cursor can't wander
   // out of the modal either. The page's own setting is put back after.
-  const modalOpen = confirmation != null || annotateId != null || downloadOpen;
+  const modalOpen = confirmation != null || annotating != null || downloadOpen;
   useEffect(() => {
     if (!modalOpen) return;
     return makeBehindModalInert(host);
@@ -251,7 +330,10 @@ export function ReviewPanel({
     detectPage(pageKey);
   };
 
-  const handleAddScreenshotTo = async (comment: ReviewComment) => {
+  const handleAddScreenshotTo = async (
+    commentPage: string,
+    comment: ReviewComment,
+  ) => {
     setToast(null);
     capturing.current = true;
     setCaptureTarget(comment.id);
@@ -266,7 +348,7 @@ export function ReviewPanel({
       return;
     }
     review.updateComment(
-      pageKey,
+      commentPage,
       comment.id,
       { screenshot: result.dataUrl },
       "now",
@@ -276,12 +358,13 @@ export function ReviewPanel({
 
   // From the row menu: focus goes back to the menu's trigger, not into
   // the new comment (the menu rule).
-  const handleDuplicate = (comment: ReviewComment) => {
+  // A duplicate belongs to the same page as the comment it copies.
+  const handleDuplicate = (commentPage: string, comment: ReviewComment) => {
     setToast(null);
-    review.duplicateComment(pageKey, comment);
+    review.duplicateComment(commentPage, comment);
   };
 
-  // Download report: save what the reviewer entered (name and email under
+  // Download comments: save what the reviewer entered (name and email under
   // their own keys, session details in the session, as before), then build
   // the report from exactly those values.
   const downloadWith = (values: ReportDetails) => {
@@ -299,7 +382,7 @@ export function ReviewPanel({
   };
 
   const closeEditor = (id: number) => {
-    setAnnotateId(null);
+    setAnnotating(null);
     returnFocus(`[data-shot-edit="${id}"]`, ADD_MENU);
   };
 
@@ -308,8 +391,6 @@ export function ReviewPanel({
     setConfirmation(null);
     if (current?.kind === "delete-comment")
       returnFocus(`[data-row-menu="${current.comment.id}"]`, ADD_MENU);
-    else if (current?.kind === "delete-screenshot")
-      returnFocus(`[data-shot-edit="${current.comment.id}"]`, ADD_MENU);
     else returnFocus("[data-start-over]", ADD_MENU);
   };
 
@@ -318,18 +399,10 @@ export function ReviewPanel({
     setConfirmation(null);
     if (!current) return;
     if (current.kind === "delete-comment") {
-      review.deleteComment(pageKey, current.comment.id);
-      // The comment and its menu are gone; the add field is the nearest
+      review.deleteComment(current.pageKey, current.comment.id);
+      // The comment and its menu are gone; the Add menu is the nearest
       // place to continue.
       returnFocus(ADD_MENU);
-    } else if (current.kind === "delete-screenshot") {
-      review.updateComment(
-        pageKey,
-        current.comment.id,
-        { screenshot: null },
-        "now",
-      );
-      returnFocus(`[data-shot-add="${current.comment.id}"]`, ADD_MENU);
     } else {
       review.startOver();
       // Start over is disabled now there is no session.
@@ -341,25 +414,18 @@ export function ReviewPanel({
     if (!confirmation) return null;
     if (confirmation.kind === "start-over")
       return {
-        title: "Start over",
-        consequence:
-          "Deletes every comment and screenshot on every page. The reviewer's name and email stay. This can't be undone.",
-        confirmLabel: "Start over",
+        title: "Delete all comments?",
+        consequence: `All ${plural(total, "comment", "comments")} and their screenshots, on every page, will be deleted. This can't be undone.`,
+        confirmLabel: "Delete all comments",
       };
     const id = commentName(confirmation.comment.commentNumber);
     const Id = commentName(confirmation.comment.commentNumber, true);
-    if (confirmation.kind === "delete-comment")
-      return {
-        title: `Delete ${id}`,
-        consequence: confirmation.comment.screenshot
-          ? `${Id} and its screenshot will be deleted. This can't be undone.`
-          : `${Id} will be deleted. This can't be undone.`,
-        confirmLabel: "Delete comment",
-      };
     return {
-      title: `Delete screenshot from ${id}`,
-      consequence: `Deletes the screenshot and its annotations from ${id}. The comment text stays. This can't be undone.`,
-      confirmLabel: "Delete screenshot",
+      title: `Delete ${id}?`,
+      consequence: confirmation.comment.screenshot
+        ? `${Id} and its screenshot will be deleted. This can't be undone.`
+        : `${Id} will be deleted. This can't be undone.`,
+      confirmLabel: "Delete comment",
     };
   })();
 
@@ -399,25 +465,50 @@ export function ReviewPanel({
         // report's hidden metadata.
         title="Snippy"
         closeButtonProps={{ "aria-label": "Close Snippy" }}
-        onEnterTransitionEnd={() => findInPanel(host, ADD_MENU)?.focus()}
+        // Focus starts on Add - or on the close button when Add is
+        // disabled because saved data could not be loaded.
+        onEnterTransitionEnd={() =>
+          returnFocus(ADD_MENU, ".mantine-Drawer-close")
+        }
         onExitTransitionEnd={finishClose}
       >
-        <CommentList
-          review={review}
-          pageKey={pageKey}
-          comments={pageComments}
-          formLayout={formLayout}
-          focusId={focusId}
-          onFocused={() => setFocusId(null)}
-          capturing={capturing}
-          captureTarget={captureTarget}
-          onAddScreenshotTo={handleAddScreenshotTo}
-          onDuplicate={handleDuplicate}
-          onRequestDelete={(comment) =>
-            setConfirmation({ kind: "delete-comment", comment })
-          }
-          onAnnotate={(comment) => setAnnotateId(comment.id)}
-        />
+        {/* Storage could not be read: say so where the list would be. The
+            one text in the panel body, and the reason Add is disabled. */}
+        {loadFailed ? (
+          <Text id={LOAD_ERROR_ID} role="alert">
+            Your saved comments could not be loaded, so adding comments is
+            turned off. Close Snippy and open it again to try again.
+          </Text>
+        ) : (
+          <CommentList
+            review={review}
+            grouped={!pageOnly}
+            groups={groups}
+            showImages={showImages}
+            formLayout={formLayout}
+            focusId={focusId}
+            onFocused={() => setFocusId(null)}
+            capturing={capturing}
+            captureTarget={captureTarget}
+            onAddScreenshotTo={handleAddScreenshotTo}
+            onDuplicate={handleDuplicate}
+            onRequestDelete={(commentPage, comment) =>
+              setConfirmation({
+                kind: "delete-comment",
+                pageKey: commentPage,
+                comment,
+              })
+            }
+            onAnnotate={(comment) =>
+              setAnnotating({
+                pageKey:
+                  groups.find((g) => g.comments.includes(comment))?.pageKey ??
+                  pageKey,
+                id: comment.id,
+              })
+            }
+          />
+        )}
 
         {/*
           No save-status text (an approved exception to the autosave
@@ -426,25 +517,42 @@ export function ReviewPanel({
         */}
         {/* Buttons only, no text (owner decision). */}
         <Panel.Footer>
-          <Group justify="space-between" wrap="nowrap" gap="rec-sm" w="100%">
+          {/* At the narrowest panel widths the two default-size buttons,
+              with the count, don't fit on one line. They wrap rather than
+              cut the label short, and Download comments stays at the right.
+              Open with the owner. */}
+          <Group justify="space-between" wrap="wrap" gap="rec-sm" w="100%">
+            {/* The footer's two buttons are the default size; every other
+                button in the panel is small (owner decision). */}
             <Button
               variant="text"
-              size="small"
               disabled={!session}
               data-start-over="true"
               onClick={() => setConfirmation({ kind: "start-over" })}
             >
               Start over
             </Button>
-            <Button
-              variant="solid"
-              size="small"
-              disabled={total === 0}
-              data-download="true"
-              onClick={() => setDownloadOpen(true)}
-            >
-              Download report
-            </Button>
+            {/* The count is every comment in the report, on every page -
+                not only the ones showing. In parentheses after a label
+                that doesn't change, left out at zero; the accessible name
+                spells it out. */}
+            <Group ml="auto">
+              <Button
+                variant="solid"
+                disabled={total === 0}
+                data-download="true"
+                aria-label={
+                  total > 0
+                    ? `Download ${plural(total, "comment", "comments")}`
+                    : undefined
+                }
+                onClick={() => setDownloadOpen(true)}
+              >
+                {total > 0
+                  ? `Download comments (${formatCount(total)})`
+                  : "Download comments"}
+              </Button>
+            </Group>
           </Group>
         </Panel.Footer>
       </Panel>
@@ -483,9 +591,28 @@ export function ReviewPanel({
         onCancel={cancelConfirmation}
         onConfirm={confirm}
       />
+      {viewSlot &&
+        !loadFailed &&
+        createPortal(
+          <ViewControls
+            pageOnly={pageOnly}
+            showImages={showImages}
+            onPageOnlyChange={(next) => {
+              setPageOnly(next);
+              review.track(savePageOnly(next));
+            }}
+            onShowImagesChange={(next) => {
+              setShowImages(next);
+              review.track(saveShowImages(next));
+            }}
+          />,
+          viewSlot,
+        )}
       {headerSlot &&
         createPortal(
           <AddMenu
+            disabled={loadFailed}
+            describedBy={loadFailed ? LOAD_ERROR_ID : undefined}
             busy={captureTarget === "screenshot" || captureTarget === "element"}
             onAddComment={handleAddComment}
             onAddScreenshot={handleAddScreenshot}
@@ -508,7 +635,7 @@ export function ReviewPanel({
           onDownload={downloadWith}
         />
       )}
-      {annotateComment?.screenshot && (
+      {annotating && annotateComment?.screenshot && (
         <AnnotationEditor
           comment={{
             ...annotateComment,
@@ -522,22 +649,23 @@ export function ReviewPanel({
           onCancel={() => closeEditor(annotateComment.id)}
           onSave={(dataUrl) => {
             review.updateComment(
-              pageKey,
+              annotating.pageKey,
               annotateComment.id,
               { screenshot: dataUrl },
               "now",
             );
             closeEditor(annotateComment.id);
           }}
-          // A confirmation replaces the editor rather than stacking on it:
-          // the editor closes (discarding any unsaved drawing) and the
-          // delete confirmation opens in its place.
-          onRequestDeleteScreenshot={() => {
-            setAnnotateId(null);
-            setConfirmation({
-              kind: "delete-screenshot",
-              comment: annotateComment,
-            });
+          // Confirmed in the editor, which asks first.
+          onDeleteScreenshot={() => {
+            review.updateComment(
+              annotating.pageKey,
+              annotateComment.id,
+              { screenshot: null },
+              "now",
+            );
+            setAnnotating(null);
+            returnFocus(`[data-shot-add="${annotateComment.id}"]`, ADD_MENU);
           }}
         />
       )}

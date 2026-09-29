@@ -90,22 +90,38 @@
   object-position: left top;
 }
 
-/* The comment list: one group per comment, separated by a divider line
-   that reuses the panel's own divider tokens (the same line that separates
-   its header and footer). The kit has no divider component. The space
-   inside a group comes from its Stack; the space between groups is the
-   list's own gap plus this padding, so groups sit further apart than the
-   parts inside them. */
+/* The comment list: one card per comment (the kit's Card), so the cards
+   separate the comments - no divider line. The list is a plain list; the
+   space between cards is its Stack gap, a spacing token. */
 .art-list {
   list-style: none;
   margin: 0;
   padding: 0;
 }
-.art-row + .art-row {
-  border-top: var(--recursica_ui-kit_components_panel_properties_divider-size)
+
+/* The view switches (This page only, Show images), pinned between the
+   panel header and its scrolling body, so they stay put while the list
+   scrolls. The kit's panel has no slot for a pinned toolbar, so this slot
+   is placed there and the switches are rendered into it (a reported gap).
+   Its padding and bottom divider are the panel body's own padding and
+   divider tokens, so it lines up with the list below. */
+.art-view-slot {
+  flex-shrink: 0;
+  padding: var(
+      --recursica_ui-kit_components_panel_properties_content-vertical-padding
+    )
+    var(
+      --recursica_ui-kit_components_panel_properties_content-horizontal-padding
+    );
+  border-bottom: var(
+      --recursica_ui-kit_components_panel_properties_divider-size
+    )
     solid
     var(--recursica_ui-kit_components_panel_properties_colors_divider-color);
-  padding-top: var(--recursica_brand_dimensions_general_xl);
+}
+/* Nothing to show (saved data could not be loaded): no empty strip. */
+.art-view-slot:empty {
+  display: none;
 }
 
 /* The annotation editor's image area: the only part of the editor that
@@ -115,6 +131,15 @@
 .art-shot-scroll {
   max-height: 55vh;
   overflow: auto;
+}
+/* The bordered container around that area, so the image's edge is easy to
+   see against the modal. Its border is the modal's own border (size and
+   colour tokens), its radius the brand's default. */
+.art-shot-well {
+  border: var(--recursica_ui-kit_components_modal_properties_border-size) solid
+    var(--recursica_ui-kit_components_modal_properties_colors_border-color);
+  border-radius: var(--recursica_brand_dimensions_border-radii_default);
+  overflow: hidden;
 }
 
 /* Text for screen readers only: the reason Save annotations starts
@@ -135,7 +160,10 @@
    so every stroke has a thin contrasting edge. */
 .art-shot {
   position: relative;
-  display: inline-block;
+  /* A block as wide as the image (not inline-block, which leaves a strip
+     for text descenders under it inside the bordered container). */
+  display: block;
+  width: fit-content;
   line-height: 0;
   max-width: 100%;
   /* Shrink to the image inside a flex layout, so the drawing layers cover

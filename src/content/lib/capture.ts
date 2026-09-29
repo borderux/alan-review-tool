@@ -40,7 +40,8 @@ export function selectRegion(): Promise<Rect | null> {
     // No tint: the page stays fully visible. The frame around the
     // viewport says capture mode is on instead.
     overlay.style.background = "transparent";
-    overlay.appendChild(createViewportFrame());
+    const frame = createViewportFrame();
+    overlay.appendChild(frame);
     document.documentElement.appendChild(overlay);
 
     // What to do, announced: a live region inserted empty and filled a
@@ -87,6 +88,12 @@ export function selectRegion(): Promise<Rect | null> {
 
     function onMouseDown(event: MouseEvent) {
       dragging = true;
+      // Once the drag starts, only the selection rectangle stays on screen:
+      // the instructions and the viewport frame go, so the reviewer never
+      // wonders whether they will be in the picture. (They never are - the
+      // whole overlay is removed before any pixels are taken.)
+      help.style.display = "none";
+      frame.style.display = "none";
       startX = event.clientX;
       startY = event.clientY;
       box.style.left = `${startX}px`;

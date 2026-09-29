@@ -14,6 +14,10 @@ export const EMAIL_STORAGE_KEY = "snippyEmail";
 // The annotation pen's last colour: a preference, like the width, so it is
 // never cleared by Start over.
 export const PEN_COLOR_STORAGE_KEY = "snippyPenColor";
+// The two view switches above the comment list: preferences too, each
+// under its own key, never cleared by Start over. Both default to on.
+export const PAGE_ONLY_STORAGE_KEY = "snippyPageOnly";
+export const SHOW_IMAGES_STORAGE_KEY = "snippyShowImages";
 // Keys no current version reads: the New comment field's draft, from
 // before the panel had a single Add menu. Deleted on load.
 const OBSOLETE_KEYS = ["snippyDraft", "taggerDraft"];
@@ -57,7 +61,26 @@ export interface StoredState {
   userName: string;
   userEmail: string;
   penColor: PenColor;
+  pageOnly: boolean;
+  showImages: boolean;
+  // True when storage could not be read at all. The panel still opens,
+  // with nothing loaded, Add disabled and a message saying so. With Add
+  // disabled no session can start, so the session that could not be read
+  // is never written over.
+  loadFailed?: boolean;
 }
+
+// What the panel opens with when storage can't be read.
+export const FAILED_LOAD_STATE: StoredState = {
+  width: DEFAULT_WIDTH,
+  session: null,
+  userName: "",
+  userEmail: "",
+  penColor: DEFAULT_PEN_COLOR,
+  pageOnly: true,
+  showImages: true,
+  loadFailed: true,
+};
 
 // The storage keys were renamed with the product, twice: alanReviewTool*
 // to tagger* to snippy*. For each current key that is missing, the value is
@@ -87,8 +110,9 @@ export async function migrateStorageKeys(): Promise<void> {
 // Normalizes a session read from storage, in place, before anything else
 // touches it. Real users' storage holds sessions from every version of
 // this extension they have had installed, and old-shape data reaching new
-// code has already crashed the panel on load once. Unchanged from the
-// pre-React panel: the stored shape itself has not changed.
+// code has already crashed the panel on load once. The stored shape itself
+// has not changed since the pre-React panel; only optional fields were
+// added, and comment numbers are now kept gapless (see renumberComments).
 export function migrateSession(raw: unknown): Session | null {
   if (!raw || typeof raw !== "object") return null;
   const session = raw as Session;
@@ -150,6 +174,23 @@ export function migrateSession(raw: unknown): Session | null {
       }
     }
   }
+  // Comments are numbered 1 to N with no gaps. Sessions saved before that
+  // rule kept a deleted comment's number unused, so they are renumbered
+  // here, in the order the old numbers give (which was creation order).
+  renumberComments(session);
+  return session;
+}
+
+// Numbers every comment in the session 1 to N, across all pages, in
+// creation order, and sets commentCounter to N. The existing numbers give
+// the order (they have always increased with creation); the comment id, a
+// creation timestamp, breaks any tie. Changes the session in place; the
+// stored shape is unchanged. Run after every delete, and on load.
+export function renumberComments(session: Session): Session {
+  const all = Object.values(session.pages).flatMap((page) => page.comments);
+  all.sort((a, b) => a.commentNumber - b.commentNumber || a.id - b.id);
+  all.forEach((comment, i) => (comment.commentNumber = i + 1));
+  session.commentCounter = all.length;
   return session;
 }
 
@@ -161,6 +202,8 @@ export async function loadStoredState(): Promise<StoredState> {
     USER_STORAGE_KEY,
     EMAIL_STORAGE_KEY,
     PEN_COLOR_STORAGE_KEY,
+    PAGE_ONLY_STORAGE_KEY,
+    SHOW_IMAGES_STORAGE_KEY,
   ]);
   const storedPen = stored[PEN_COLOR_STORAGE_KEY] as PenColor | undefined;
   return {
@@ -178,6 +221,9 @@ export async function loadStoredState(): Promise<StoredState> {
       storedPen && PEN_COLORS.includes(storedPen)
         ? storedPen
         : DEFAULT_PEN_COLOR,
+    // Anything but an explicit false is the default, on.
+    pageOnly: stored[PAGE_ONLY_STORAGE_KEY] !== false,
+    showImages: stored[SHOW_IMAGES_STORAGE_KEY] !== false,
   };
 }
 
@@ -210,4 +256,12 @@ export function saveWidth(width: number): Promise<void> {
 
 export function savePenColor(color: PenColor): Promise<void> {
   return chrome.storage.local.set({ [PEN_COLOR_STORAGE_KEY]: color });
+}
+
+export function savePageOnly(pageOnly: boolean): Promise<void> {
+  return chrome.storage.local.set({ [PAGE_ONLY_STORAGE_KEY]: pageOnly });
+}
+
+export function saveShowImages(showImages: boolean): Promise<void> {
+  return chrome.storage.local.set({ [SHOW_IMAGES_STORAGE_KEY]: showImages });
 }

@@ -3,6 +3,7 @@ import type { FocusEvent, MutableRefObject } from "react";
 import { Camera, DotsThree } from "@phosphor-icons/react";
 import {
   Button,
+  Card,
   Group,
   Heading,
   Menu,
@@ -21,6 +22,15 @@ interface CommentItemProps {
   comment: ReviewComment;
   formLayout: FormLayout;
   capturingScreenshot: boolean;
+  // Heading level for the comment's number: one below the page headings
+  // when the list is grouped by page.
+  headingOrder: 3 | 4;
+  // Whether the screenshot or element image shows in the panel ("Show
+  // images"). Off, the element summary and Add annotations stay.
+  showImages: boolean;
+  // Add screenshot captures the page on screen, so it is only offered on
+  // comments about that page.
+  canAddScreenshot: boolean;
   autoFocus: boolean;
   onFocused: () => void;
   capturing: MutableRefObject<boolean>;
@@ -32,18 +42,21 @@ interface CommentItemProps {
   onAnnotate: () => void;
 }
 
-// One comment. Each row is one comment - a single field labelled
-// "Comment" - and a screenshot or a captured element is supporting
-// material attached to it, shown in its own bordered frame (the image and
-// its Add annotations button only; never the text box).
+// One comment, as one card (the kit's Card): its number as the card's
+// heading with the row actions beside it, then the screenshot or captured
+// element in its own bordered frame (the image and its Add annotations
+// button only), then the single field labelled "Comment".
 //
-// Each row is a group: its number as a heading, then its parts, with a
-// divider line between groups (see panel.css). No card: a form control
-// never goes inside one.
+// Approved exception (owner decision): the card holds a form control. The
+// card rule forbids any form control in a card; the owner wants each
+// comment, text box included, on one card.
 export function CommentItem({
   comment,
   formLayout,
   capturingScreenshot,
+  headingOrder,
+  showImages,
+  canAddScreenshot,
   autoFocus,
   onFocused,
   capturing,
@@ -86,110 +99,124 @@ export function CommentItem({
     if (!comment.text.trim() && !comment.screenshot) onLeftEmpty();
   };
 
+  const summary = comment.element && (
+    <Text variant="caption" emphasis="low" truncate>
+      {elementSummary(comment.element)}
+    </Text>
+  );
+  const annotate = (
+    <Button
+      variant="outline"
+      size="small"
+      aria-label={`Add annotations to ${name}`}
+      data-shot-edit={comment.id}
+      onClick={onAnnotate}
+    >
+      Add annotations
+    </Button>
+  );
+
   return (
     <li className="art-row" onBlur={onBlur}>
-      <Stack gap="rec-lg">
-        <Group justify="space-between" wrap="nowrap" gap="rec-sm">
-          <Heading
-            order={3}
-            aria-label={commentName(comment.commentNumber, true)}
-          >
-            {number}
-          </Heading>
-          <Group gap="rec-sm" wrap="nowrap">
-            {!hasShot && (
-              <Tooltip label="Add screenshot">
-                <Button
-                  variant="outline"
-                  size="small"
-                  icon={<Camera />}
-                  loading={capturingScreenshot}
-                  aria-label={`Add screenshot to ${name}`}
-                  data-shot-add={comment.id}
-                  onClick={onAddScreenshot}
-                />
-              </Tooltip>
-            )}
-            <Menu
-              trapFocus={false}
-              opened={menuOpened}
-              onChange={setMenuOpened}
+      <Card>
+        <Card.Header>
+          <Group justify="space-between" wrap="nowrap" gap="rec-sm">
+            <Heading
+              order={headingOrder}
+              aria-label={commentName(comment.commentNumber, true)}
             >
-              <Tooltip label="More actions">
-                <Menu.Target>
+              {number}
+            </Heading>
+            <Group gap="rec-sm" wrap="nowrap">
+              {!hasShot && canAddScreenshot && (
+                <Tooltip label="Add screenshot">
                   <Button
                     variant="outline"
                     size="small"
-                    icon={<DotsThree />}
-                    ref={menuTriggerRef}
-                    aria-label={`More actions for ${name}`}
-                    data-row-menu={comment.id}
+                    icon={<Camera />}
+                    loading={capturingScreenshot}
+                    aria-label={`Add screenshot to ${name}`}
+                    data-shot-add={comment.id}
+                    onClick={onAddScreenshot}
                   />
-                </Menu.Target>
-              </Tooltip>
-              <Menu.Dropdown onKeyDown={onMenuKeyDown}>
-                <Menu.Item ref={menuFirstItemRef} onClick={onDuplicate}>
-                  Duplicate comment
-                </Menu.Item>
-                <Menu.Item onClick={onDelete}>Delete comment</Menu.Item>
-              </Menu.Dropdown>
-            </Menu>
+                </Tooltip>
+              )}
+              <Menu
+                trapFocus={false}
+                opened={menuOpened}
+                onChange={setMenuOpened}
+              >
+                <Tooltip label="More actions">
+                  <Menu.Target>
+                    <Button
+                      variant="outline"
+                      size="small"
+                      icon={<DotsThree />}
+                      ref={menuTriggerRef}
+                      aria-label={`More actions for ${name}`}
+                      data-row-menu={comment.id}
+                    />
+                  </Menu.Target>
+                </Tooltip>
+                <Menu.Dropdown onKeyDown={onMenuKeyDown}>
+                  <Menu.Item ref={menuFirstItemRef} onClick={onDuplicate}>
+                    Duplicate comment
+                  </Menu.Item>
+                  <Menu.Item onClick={onDelete}>Delete comment</Menu.Item>
+                </Menu.Dropdown>
+              </Menu>
+            </Group>
           </Group>
-        </Group>
-
-        {/* The supporting material, framed on its own: the image, a short
-            summary for an element, and the button that acts on the image.
-            The full selector, HTML and styles are in the report. */}
-        {hasShot && (
-          <div className="art-shot-frame">
-            <img
-              className="art-thumb"
-              src={comment.screenshot ?? undefined}
-              alt={
-                comment.element
-                  ? `Screenshot of the element in ${name}`
-                  : `Screenshot attached to ${name}`
-              }
-            />
-            {comment.element && (
-              <Text variant="caption" emphasis="low" truncate>
-                {elementSummary(comment.element)}
-              </Text>
+        </Card.Header>
+        <Card.Content>
+          <Stack gap="rec-lg">
+            {/* The supporting material, framed on its own: the image, a
+                short summary for an element, and the button that acts on
+                the image. The full selector, HTML and styles are in the
+                report. With images hidden there is no frame: the summary
+                and the button stay, so annotating still works. */}
+            {hasShot && showImages && (
+              <div className="art-shot-frame">
+                <img
+                  className="art-thumb"
+                  src={comment.screenshot ?? undefined}
+                  alt={
+                    comment.element
+                      ? `Screenshot of the element in ${name}`
+                      : `Screenshot attached to ${name}`
+                  }
+                />
+                {summary}
+                {annotate}
+              </div>
             )}
-            <Button
-              variant="outline"
-              size="small"
-              aria-label={`Add annotations to ${name}`}
-              data-shot-edit={comment.id}
-              onClick={onAnnotate}
-            >
-              Add annotations
-            </Button>
-          </div>
-        )}
-        {!hasShot && comment.element && (
-          <Text variant="caption" emphasis="low" truncate>
-            {elementSummary(comment.element)}
-          </Text>
-        )}
+            {hasShot && !showImages && (
+              <Stack gap="rec-md" align="flex-start">
+                {summary}
+                {annotate}
+              </Stack>
+            )}
+            {!hasShot && summary}
 
-        <TextArea
-          ref={textRef}
-          label="Comment"
-          {...fieldLayout(formLayout)}
-          autosize
-          minRows={1}
-          placeholder={
-            comment.element
-              ? "Describe what's wrong with this element"
-              : hasShot
-                ? "Describe what the screenshot shows"
-                : "Describe the issue or change"
-          }
-          value={comment.text}
-          onChange={(event) => onTextChange(event.currentTarget.value)}
-        />
-      </Stack>
+            <TextArea
+              ref={textRef}
+              label="Comment"
+              {...fieldLayout(formLayout)}
+              autosize
+              minRows={1}
+              placeholder={
+                comment.element
+                  ? "Describe the change or feedback for this element"
+                  : hasShot
+                    ? "Describe the change or feedback for this screenshot"
+                    : "Describe the change or feedback"
+              }
+              value={comment.text}
+              onChange={(event) => onTextChange(event.currentTarget.value)}
+            />
+          </Stack>
+        </Card.Content>
+      </Card>
     </li>
   );
 }

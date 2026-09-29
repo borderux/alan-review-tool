@@ -18,7 +18,9 @@ export function generateGuid(): string {
 }
 
 // The one place a comment's number is turned into text. Comments are
-// numbered 1, 2, 3 - the stored commentNumber, monotonic and never reused.
+// numbered 1 to N across the session, in creation order, with no gaps -
+// the stored commentNumber, renumbered after every delete. A number is a
+// position, not a permanent id.
 // formatCommentId is the bare number (the visible heading, and the
 // report's data-comment-id); commentName is how it is referred to in words
 // ("comment 3", "Comment 3").

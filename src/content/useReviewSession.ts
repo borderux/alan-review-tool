@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { generateGuid } from "./lib/ids";
-import { saveReviewer, saveSession } from "./lib/storage";
+import { renumberComments, saveReviewer, saveSession } from "./lib/storage";
 import type { RecursicaDetection } from "./lib/recursica";
 import type { CapturedElement, ReviewComment, Session } from "./lib/types";
 
@@ -122,8 +122,8 @@ export function useReviewSession({
   useEffect(() => flush, [flush]);
 
   // Creates a comment at the top of the page's list (newest first) and
-  // returns its id. The comment number only ever goes up, even across
-  // deletes: the number plus the session guid is a permanent id.
+  // returns its id. Comments are numbered 1 to N across the whole session,
+  // in creation order, so a new one is always N + 1 (commentCounter is N).
   const addComment = useCallback(
     (
       pageKey: string,
@@ -196,16 +196,24 @@ export function useReviewSession({
     [commit],
   );
 
+  // Deleting renumbers every remaining comment, so the numbers stay 1 to
+  // N with no gaps: a deleted number is not kept back.
   const deleteComment = useCallback(
     (pageKey: string, id: number) => {
       const current = latest.current;
       if (!current?.pages[pageKey]) return;
-      commit(
-        withPageComments(current, pageKey, (comments) =>
-          comments.filter((c) => c.id !== id),
-        ),
-        "now",
+      const without = withPageComments(current, pageKey, (comments) =>
+        comments.filter((c) => c.id !== id),
       );
+      // Fresh comment objects, so the renumbering never changes anything
+      // React is still holding.
+      const pages = Object.fromEntries(
+        Object.entries(without.pages).map(([key, page]) => [
+          key,
+          { ...page, comments: page.comments.map((c) => ({ ...c })) },
+        ]),
+      );
+      commit(renumberComments({ ...without, pages }), "now");
     },
     [commit],
   );
