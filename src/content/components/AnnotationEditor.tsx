@@ -9,7 +9,7 @@ import {
   Stack,
   Text,
 } from "@recursica/adapter-mantine-v8";
-import { formatCommentId } from "../lib/ids";
+import { commentName } from "../lib/ids";
 import { OUTLINE_PX, PEN, STROKE_PX } from "../lib/pen";
 import { PEN_COLORS, type PenColor } from "../lib/storage";
 import type { ReviewComment } from "../lib/types";
@@ -40,7 +40,7 @@ export function AnnotationEditor({
   onSave,
   onRequestDeleteScreenshot,
 }: AnnotationEditorProps) {
-  const id = formatCommentId(comment.commentNumber);
+  const id = commentName(comment.commentNumber);
   const target = useModalPortal();
   const imgRef = useRef<HTMLImageElement>(null);
   const outlineRef = useRef<HTMLCanvasElement>(null);
@@ -147,7 +147,7 @@ export function AnnotationEditor({
     <Modal
       opened
       onClose={onCancel}
-      title={`Screenshot ${id}`}
+      title={`Screenshot for ${id}`}
       portalProps={{ target }}
       // A click on the backdrop must never throw away a drawing.
       closeOnClickOutside={false}
@@ -166,7 +166,6 @@ export function AnnotationEditor({
             <Text>Drag on the screenshot to draw</Text>
             <Button
               variant="text"
-              size="small"
               // Always enabled: disabling itself on click would drop keyboard
               // focus. With nothing drawn it simply does nothing.
               onClick={clearDrawing}

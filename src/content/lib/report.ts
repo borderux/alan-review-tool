@@ -7,7 +7,7 @@ import REPORT_CSS from "../../report.css?raw";
 import AI_INSTRUCTIONS from "../../ai-report-instructions.txt?raw";
 import { HTML_CAP } from "./element";
 import { formatCount, formatDateTimeWithZone, plural } from "./format";
-import { formatCommentId } from "./ids";
+import { commentName, formatCommentId } from "./ids";
 import type { CapturedElement, Session } from "./types";
 
 function escapeHtml(str: string): string {
@@ -85,13 +85,13 @@ export function buildReportHtml({
               `<a href="#_" id="${shotId}" class="lightbox"><img src="${comment.screenshot}" alt="Screenshot" /></a>`,
             );
           }
-          // The visible CM-<n> id plus the hidden session guid (in the
-          // head, once) together make a globally unique id per comment.
-          const commentId =
-            comment.commentNumber != null
-              ? formatCommentId(comment.commentNumber)
-              : "";
-          return `<div class="comment" data-comment-id="${escapeHtml(commentId)}"><div class="comment-body">${commentId ? `<p class="comment-id">${escapeHtml(commentId)}</p>` : ""}<p class="comment-text">${escapeHtml(comment.text).replace(/\n/g, "<br>")}</p>${comment.element ? elementHtml(comment.element) : ""}</div>${shotsHtml}</div>`;
+          // The comment number plus the hidden session guid (in the head,
+          // once) together make a globally unique id per comment.
+          const hasNumber = comment.commentNumber != null;
+          const commentId = hasNumber
+            ? formatCommentId(comment.commentNumber)
+            : "";
+          return `<div class="comment" data-comment-id="${escapeHtml(commentId)}"><div class="comment-body">${hasNumber ? `<p class="comment-id">${escapeHtml(commentName(comment.commentNumber, true))}</p>` : ""}<p class="comment-text">${escapeHtml(comment.text).replace(/\n/g, "<br>")}</p>${comment.element ? elementHtml(comment.element) : ""}</div>${shotsHtml}</div>`;
         })
         .join("\n");
 
@@ -112,6 +112,7 @@ ${commentsHtml}
 <meta charset="utf-8">
 <title>Snippy report</title>
 ${session?.guid ? `<meta name="snippy-session-id" content="${escapeHtml(session.guid)}">` : ""}
+<meta name="snippy-version" content="${escapeHtml(__APP_VERSION__)}">
 <meta name="ai-report-instructions" content="${escapeHtml(AI_INSTRUCTIONS)}">
 <style>${REPORT_CSS}</style>
 </head>

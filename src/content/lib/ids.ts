@@ -17,6 +17,15 @@ export function generateGuid(): string {
   return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10, 16).join("")}`;
 }
 
+// The one place a comment's number is turned into text. Comments are
+// numbered 1, 2, 3 - the stored commentNumber, monotonic and never reused.
+// formatCommentId is the bare number (the visible heading, and the
+// report's data-comment-id); commentName is how it is referred to in words
+// ("comment 3", "Comment 3").
 export function formatCommentId(n: number): string {
-  return `CM-${n}`;
+  return String(n);
+}
+
+export function commentName(n: number, capitalized = false): string {
+  return `${capitalized ? "Comment" : "comment"} ${formatCommentId(n)}`;
 }

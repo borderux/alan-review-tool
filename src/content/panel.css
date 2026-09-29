@@ -45,12 +45,11 @@
 }
 
 /* The parts of the panel that stay put while the tab content scrolls: the
-   tab bar, and the Comments tab's add controls. The panel body is the one
-   scroll container (the approved scroll exception); these stick to its
-   top. They need an opaque background so content scrolls underneath them,
-   taken from the panel's own background token. The add controls stick
-   just below the tab bar, whose height is measured into --art-pinned-top.
-   No kit component pins part of a panel, so this is a reported gap. */
+   toolbar with the Add menu. The panel body is the one scroll container
+   (the approved scroll exception); the toolbar sticks to its top. It needs
+   an opaque background so content scrolls underneath it, taken from the
+   panel's own background token. No kit component pins part of a panel, so
+   this is a reported gap. */
 .art-pinned {
   position: sticky;
   z-index: 2;
@@ -58,11 +57,11 @@
     --recursica_ui-kit_components_panel_properties_colors_background-color
   );
 }
-/* The tab bar sticks at the very top of the panel body, covering the
+/* The toolbar sticks at the very top of the panel body, covering the
    body's own top padding too: a sticky element otherwise stops below that
    padding, and rows would show through the gap above it. The negative
    margin keeps its resting position unchanged. */
-.art-pinned-tabs {
+.art-pinned-top {
   top: calc(
     var(
         --recursica_ui-kit_components_panel_properties_content-vertical-padding
@@ -79,24 +78,32 @@
     --recursica_ui-kit_components_panel_properties_content-vertical-padding
   );
 }
-/* The add controls stick directly below it. */
-.art-pinned-below-tabs {
-  top: calc(
-    var(--art-pinned-top, 0px) -
-      var(
-        --recursica_ui-kit_components_panel_properties_content-vertical-padding
-      )
-  );
-  padding-bottom: var(--recursica_brand_dimensions_general_default);
-}
 
-/* A comment's screenshot thumbnail. No image or thumbnail component
-   exists in the kit. */
+/* A comment's supporting material - its screenshot, or the screenshot of
+   a captured element - in its own bordered frame: the image, a short
+   summary for an element, and the Add annotations button beneath, so the
+   button is visibly attached to the image. Never the comment's text box.
+   The border is the panel's own border (its size and colour tokens), the
+   radius the brand's default: the layer-0 border is zero-width, so it
+   can't draw a frame. No image or thumbnail component exists in the kit. */
+.art-shot-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--recursica_brand_dimensions_general_sm);
+  align-self: flex-start;
+  max-width: 100%;
+  padding: var(--recursica_brand_dimensions_general_sm);
+  border: var(--recursica_ui-kit_components_panel_properties_border-size) solid
+    var(--recursica_ui-kit_components_panel_properties_colors_border-color);
+  border-radius: var(--recursica_brand_dimensions_border-radii_default);
+}
 .art-thumb {
   display: block;
-  width: 64px;
-  height: 48px;
-  object-fit: cover;
+  width: 240px;
+  max-width: 100%;
+  height: 135px;
+  object-fit: contain;
 }
 
 /* The comment list: one group per comment, separated by a divider line
@@ -115,12 +122,6 @@
     solid
     var(--recursica_ui-kit_components_panel_properties_colors_divider-color);
   padding-top: var(--recursica_brand_dimensions_general_lg);
-}
-
-/* Help tab list. */
-.art-bullets {
-  margin: 0;
-  padding-left: var(--recursica_brand_dimensions_general_lg);
 }
 
 /* The screenshot and its two drawing layers in the annotation editor. The

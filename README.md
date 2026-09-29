@@ -12,14 +12,14 @@ JavaScript in what you export.
   domain or embedded snippet.
 - **Comments and screenshots**, grouped into a single review **session**
   that spans every page visited, not scoped to one tab or one origin.
-- **Fast comments** — type in New comment and press Enter; each comment
-  lands in a numbered list and focus stays in the field for the next one.
+- **One Add menu** — Comment, Screenshot or Element. Each creates a new
+  numbered comment at the top of the list, with focus in its text box.
 - **Screenshot capture with freehand annotation** — drag-select any region
   of the page, then use Add annotations to draw on it in one of six
   colors (red by default; the last choice is remembered). Every stroke
   has a thin contrasting outline so it shows on light and dark
   screenshots. Save annotations bakes the drawing into the image.
-- **Element capture** — Add element lets you pick any element on the page,
+- **Element capture** — Add, then Element, lets you pick any element on the page,
   like the browser's element inspector (hover and click, or the arrow keys
   and Enter). Snippy records its selector, HTML, key computed styles, the
   viewport size and a screenshot of just that element, with typed form
@@ -28,14 +28,15 @@ JavaScript in what you export.
   Recursica Mantine adapter, with the default Recursica Forge theme), in
   light or dark mode following your operating system.
 - **Resizable panel** that remembers its width (drag the left edge, or
-  focus it and use the arrow keys), and reviewer identity (name/email)
-  that persists across sessions.
+  focus it and use the arrow keys). Download report asks for the
+  reviewer's name, email and session details each time, prefilled with
+  the last values used.
 - **Exports a single, self-contained HTML report** — header, table of
   contents, one section per page, tight comment list, 50×50 thumbnails
   with a full-resolution lightbox. The lightbox is pure CSS (`:target`,
   no JavaScript at all); the whole report has zero `<script>` tags.
-- **Every comment gets a permanent, never-reused `CM-<n>` id**, and every
-  session gets its own hidden guid — combine the two for a globally
+- **Every comment gets a permanent, never-reused number** (1, 2, 3), and
+  every session gets its own hidden guid — combine the two for a globally
   unique id per piece of feedback.
 - **Report includes hidden, AI-readable parsing instructions** — a coding
   agent handed this report can find each page, comment, and screenshot,

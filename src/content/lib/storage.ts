@@ -13,9 +13,9 @@ export const EMAIL_STORAGE_KEY = "snippyEmail";
 // The annotation pen's last colour: a preference, like the width, so it is
 // never cleared by Start over.
 export const PEN_COLOR_STORAGE_KEY = "snippyPenColor";
-// The unsent text in the New comment field. Kept so closing the panel
-// never throws it away; cleared once the comment is added.
-export const DRAFT_STORAGE_KEY = "snippyDraft";
+// Keys no current version reads: the New comment field's draft, from
+// before the panel had a single Add menu. Deleted on load.
+const OBSOLETE_KEYS = ["snippyDraft", "taggerDraft"];
 
 // The same values under the names of earlier generations of the product,
 // newest first: Tagger (a working name, only ever on the development
@@ -27,7 +27,6 @@ const LEGACY_KEYS: Record<string, string[]> = {
   [USER_STORAGE_KEY]: ["taggerUser", "alanReviewToolUser"],
   [EMAIL_STORAGE_KEY]: ["taggerEmail", "alanReviewToolEmail"],
   [PEN_COLOR_STORAGE_KEY]: ["taggerPenColor"],
-  [DRAFT_STORAGE_KEY]: ["taggerDraft"],
 };
 
 export const PEN_COLORS = [
@@ -58,7 +57,6 @@ export interface StoredState {
   userName: string;
   userEmail: string;
   penColor: PenColor;
-  draft: string;
 }
 
 // The storage keys were renamed with the product, twice: alanReviewTool*
@@ -70,7 +68,7 @@ export interface StoredState {
 // reads storage; a copied session still goes through migrateSession, so an
 // old array-shaped session is normalized as well.
 export async function migrateStorageKeys(): Promise<void> {
-  const olderKeys = Object.values(LEGACY_KEYS).flat();
+  const olderKeys = [...Object.values(LEGACY_KEYS).flat(), ...OBSOLETE_KEYS];
   const stored = await chrome.storage.local.get([
     ...Object.keys(LEGACY_KEYS),
     ...olderKeys,
@@ -106,7 +104,7 @@ export function migrateSession(raw: unknown): Session | null {
       session.pages[key] = { title: key, comments: page };
     }
   }
-  // Sessions saved before the guid and the CM-<n> counter existed have
+  // Sessions saved before the guid and the comment counter existed have
   // neither. Backfill a guid, and number every existing comment oldest
   // first (each page's array is newest-first, from unshift), so numbering
   // approximates real creation order.
@@ -155,7 +153,6 @@ export async function loadStoredState(): Promise<StoredState> {
     USER_STORAGE_KEY,
     EMAIL_STORAGE_KEY,
     PEN_COLOR_STORAGE_KEY,
-    DRAFT_STORAGE_KEY,
   ]);
   const storedPen = stored[PEN_COLOR_STORAGE_KEY] as PenColor | undefined;
   return {
@@ -173,7 +170,6 @@ export async function loadStoredState(): Promise<StoredState> {
       storedPen && PEN_COLORS.includes(storedPen)
         ? storedPen
         : DEFAULT_PEN_COLOR,
-    draft: (stored[DRAFT_STORAGE_KEY] as string | undefined) || "",
   };
 }
 
@@ -202,11 +198,6 @@ export function saveReviewer(
 
 export function saveWidth(width: number): Promise<void> {
   return chrome.storage.local.set({ [WIDTH_STORAGE_KEY]: width });
-}
-
-export function saveDraft(draft: string): Promise<void> {
-  if (draft) return chrome.storage.local.set({ [DRAFT_STORAGE_KEY]: draft });
-  return chrome.storage.local.remove(DRAFT_STORAGE_KEY);
 }
 
 export function savePenColor(color: PenColor): Promise<void> {

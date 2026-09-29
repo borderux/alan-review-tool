@@ -34,11 +34,14 @@ Recursica design system and bundled by Vite into one content script;
     React root.
   - `App.tsx` - the Mantine provider, configured for the shadow root, and
     the Recursica layer-0 scope.
-  - `ReviewPanel.tsx` - the panel shell: open/close, Escape, focus, tabs,
-    footer, toast and modals.
-  - `components/` - the tabs (Comments, Reviewer, Help), a comment row
-    with its action menu, the annotation editor, the shared confirmation
-    modal, the resize strip.
+  - `ReviewPanel.tsx` - the panel shell: open/close, Escape, focus, the
+    footer (Start over, Download report), toast and modals.
+  - `components/` - the one view (`CommentList`: a pinned toolbar with a
+    single Add menu - Comment, Screenshot, Element - and the comment list),
+    a comment row with its action menu, the download modal (reviewer
+    name, email and session details, every time a report is downloaded),
+    the annotation editor, the shared confirmation modal, the resize strip,
+    and `useManagedMenu` (menu focus handling that works in a shadow root).
   - `useReviewSession.ts` - all session state and saving.
   - `modalPortal.ts` - hands every modal its layer-1 portal container.
   - `lib/` - framework-free modules: storage and migration, page push,
@@ -205,9 +208,10 @@ The types live in `src/content/lib/types.ts`. Reviewer identity
 (`snippyUser`, `snippyEmail`), the panel's width (`snippyPanelWidth`) and
 the annotation pen's last colour (`snippyPenColor`) are stored under
 **separate** keys and never cleared by "Start over" - they're
-identity/preference facts, not session data. The unsent text in the New
-comment field is kept under `snippyDraft`, so closing the panel never
-loses it; adding the comment clears it.
+identity/preference facts, not session data. The download modal edits
+them (and the session's details) each time a report is downloaded. An old
+`snippyDraft` / `taggerDraft` key, from when the panel had a New comment
+field, is deleted on load.
 
 The page key is the address the panel is on right now. Single-page apps
 change it without a reload, and a content script can't see the page's own
@@ -277,11 +281,13 @@ rendered with React:
 - **One section per page**, in the order first touched, each with a link to
   the page (visible text omits query params for readability; the `href`
   always has the full URL).
-- **Comments**, tight and separated, each showing a `CM-<n>` id
-  (`formatCommentId`) drawn from the session's monotonic counter - assigned
-  once at creation, across all three ways a comment is created (new
-  comment, new screenshot, duplicate), and never reused even after a
-  delete.
+- **Comments**, tight and separated, each labelled "Comment <n>" with the
+  plain number in `data-comment-id`. The number comes from the session's
+  monotonic counter - assigned once at creation, however the comment is
+  created (Add menu, duplicate), and never reused even after a delete.
+  `formatCommentId` and `commentName` in `lib/ids.ts` are the one place a
+  number becomes text, in the panel and the report alike. (Reports from
+  before this wrote it as `CM-<n>`.)
 - **Element comments** also show the captured element: its selector and
   viewport, then its HTML and styles in collapsible `<details>` sections
   (no JavaScript needed), all escaped.
@@ -298,8 +304,12 @@ collision:
   (falling back to `crypto.getRandomValues()` on plain `http://` pages,
   where `randomUUID()` isn't available). Written into the report as a hidden
   `<meta name="snippy-session-id">` - parsable, never rendered.
-- **`CM-<n>`** - one per comment, unique _within_ a session. Combine the two
-  for a globally unique id.
+- **The comment number** - one per comment, unique _within_ a session.
+  Combine the two for a globally unique id.
+
+The report's head also carries `<meta name="snippy-version">`, the
+extension version that produced it, for support. The panel itself shows no
+version; the browser's extension details do.
 
 Sessions saved before either id existed get both backfilled on load by
 `migrateSession()`: a guid gets generated, and every existing comment gets
@@ -324,8 +334,8 @@ instructions.
    `executeScript` can't be ES modules. `src/report.css` and
    `src/ai-report-instructions.txt` are imported as raw strings
    (`?raw`), the panel's stylesheets as inline strings (`?inline`), and the
-   font files inlined as data. The version shown in the panel comes from
-   `package.json` via a Vite `define`. A missing source file fails the
+   font files inlined as data. The version written into the report comes
+   from `package.json` via a Vite `define`. A missing source file fails the
    build.
 2. Copies `content.js`, `background.js` and the extension icon
    (`src/icons/icon-{16,32,48,128}.png`) into

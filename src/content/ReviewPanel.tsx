@@ -1,24 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { createPortal } from "react-dom";
-import {
-  Button,
-  Group,
-  Panel,
-  Stack,
-  Tabs,
-  Text,
-  Toast,
-} from "@recursica/adapter-mantine-v8";
-import { plural } from "./lib/format";
+import { Button, Group, Panel, Toast } from "@recursica/adapter-mantine-v8";
 import { AnnotationEditor } from "./components/AnnotationEditor";
-import { CommentsTab } from "./components/CommentsTab";
+import { CommentList, type CaptureTarget } from "./components/CommentList";
 import { ConfirmModal } from "./components/ConfirmModal";
-import { HelpTab } from "./components/HelpTab";
+import { DownloadModal, type ReportDetails } from "./components/DownloadModal";
 import { ResizeHandle } from "./components/ResizeHandle";
-import { ReviewerTab } from "./components/ReviewerTab";
 import { captureElement, captureRegion } from "./lib/capture";
-import { formatCommentId } from "./lib/ids";
+import { commentName } from "./lib/ids";
 import {
   CLOSE_EVENT,
   findInPanel,
@@ -27,12 +17,7 @@ import {
   setHostWidth,
 } from "./lib/page";
 import { downloadReport, totalCommentCount } from "./lib/report";
-import {
-  saveDraft,
-  savePenColor,
-  type PenColor,
-  type StoredState,
-} from "./lib/storage";
+import { savePenColor, type PenColor, type StoredState } from "./lib/storage";
 import type { ReviewComment } from "./lib/types";
 import { usePageKey } from "./usePageKey";
 import { useReviewSession } from "./useReviewSession";
@@ -50,10 +35,6 @@ export type FormLayout = "stacked";
 export function fieldLayout(formLayout: FormLayout) {
   return { formLayout, labelAlignment: "left" } as const;
 }
-
-// What is being captured right now: a new screenshot comment, or a
-// screenshot for an existing comment (by id).
-type CaptureTarget = "new" | "element" | number | null;
 
 // The one confirmation that can be open, if any.
 type Confirmation =
@@ -82,22 +63,16 @@ export function ReviewPanel({
     // One message at a time: a repeat replaces the one already showing.
     onSaveError: (reason) => setToast(`Changes not saved: ${reason}`),
   });
-  const { session, flush, track } = review;
+  const { session, flush } = review;
 
   const [opened, setOpened] = useState(false);
   const [width, setWidth] = useState(stored.width);
-  const [tab, setTab] = useState<string | null>("comments");
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [annotateId, setAnnotateId] = useState<number | null>(null);
+  const [downloadOpen, setDownloadOpen] = useState(false);
   const [penColor, setPenColor] = useState<PenColor>(stored.penColor);
   const [focusId, setFocusId] = useState<number | null>(null);
   const [captureTarget, setCaptureTarget] = useState<CaptureTarget>(null);
-  const [tabsBarHeight, setTabsBarHeight] = useState(0);
-  // The New comment field's text, saved as a draft (see storage.ts).
-  const [draft, setDraft] = useState(stored.draft);
-  const draftRef = useRef(stored.draft);
-  const newCommentRef = useRef<HTMLInputElement>(null);
-  const tabsBarRef = useRef<HTMLDivElement>(null);
   const closedRef = useRef(false);
   // True while a screenshot is being selected: the panel is hidden, so
   // its text loses focus, and that blur must not clean up the comment the
@@ -107,9 +82,6 @@ export function ReviewPanel({
   const pageKey = usePageKey();
   const pageComments = session?.pages[pageKey]?.comments ?? [];
   const total = totalCommentCount(session);
-  const pageCount = session
-    ? Object.values(session.pages).filter((p) => p.comments.length > 0).length
-    : 0;
   const annotateComment =
     annotateId == null
       ? null
@@ -129,23 +101,11 @@ export function ReviewPanel({
   // While a modal is open, everything behind it is inert - the host page
   // and the panel itself - so a screen reader's reading cursor can't wander
   // out of the modal either. The page's own setting is put back after.
-  const modalOpen = confirmation != null || annotateId != null;
+  const modalOpen = confirmation != null || annotateId != null || downloadOpen;
   useEffect(() => {
     if (!modalOpen) return;
     return makeBehindModalInert(host);
   }, [host, modalOpen]);
-
-  // The Comments tab's add controls pin just below the tab bar, so they
-  // need its height.
-  useEffect(() => {
-    const bar = tabsBarRef.current;
-    if (!bar) return;
-    const observer = new ResizeObserver(() =>
-      setTabsBarHeight(bar.getBoundingClientRect().height),
-    );
-    observer.observe(bar);
-    return () => observer.disconnect();
-  }, []);
 
   const finishClose = useCallback(() => {
     if (closedRef.current) return;
@@ -153,16 +113,8 @@ export function ReviewPanel({
     onClosed();
   }, [onClosed]);
 
-  // Save the draft after a pause in typing, like everything else.
-  useEffect(() => {
-    draftRef.current = draft;
-    const timer = setTimeout(() => track(saveDraft(draft)), 400);
-    return () => clearTimeout(timer);
-  }, [draft, track]);
-
   const requestClose = useCallback(() => {
     flush();
-    void saveDraft(draftRef.current);
     setOpened(false);
     setTimeout(finishClose, CLOSE_FALLBACK_MS);
   }, [flush, finishClose]);
@@ -183,7 +135,7 @@ export function ReviewPanel({
   // themselves.
   const onKeyDown = (event: ReactKeyboardEvent) => {
     if (event.key !== "Escape" || event.defaultPrevented) return;
-    if (confirmation || annotateComment) return;
+    if (confirmation || annotateComment || downloadOpen) return;
     // Judged by where the key came from, not only by state: Mantine closes
     // a modal on Escape in a capture listener on window, before this runs,
     // so by now the modal's state may already say it is closed.
@@ -217,25 +169,30 @@ export function ReviewPanel({
       }
     });
   };
-  const NEW_COMMENT = "[data-new-comment]";
-  const ACTIVE_TAB = '[role="tab"][aria-selected="true"]';
+  // Where focus goes when the control that had it is gone: the Add menu,
+  // the one control that is always there.
+  const ADD_MENU = "[data-add-menu]";
 
   const showCaptureError = (reason: string) =>
     setToast(`Screenshot not captured: ${reason}`);
 
-  const handleAddComment = (text: string) => {
+  // Each Add menu item creates a new comment at the top with focus in its
+  // text box. An empty one vanishes when left, as before.
+  const handleAddComment = () => {
     setToast(null);
-    review.addComment(pageKey, text);
+    setFocusId(review.addComment(pageKey));
   };
 
   const handleAddScreenshot = async () => {
     setToast(null);
-    setCaptureTarget("new");
+    setCaptureTarget("screenshot");
     const result = await captureRegion(host);
     setCaptureTarget(null);
-    if (!result) return;
-    if ("error" in result) {
-      showCaptureError(result.error);
+    // Cancelled or failed: no comment, and focus goes back to Add rather
+    // than being left nowhere.
+    if (!result || "error" in result) {
+      if (result) showCaptureError(result.error);
+      returnFocus(ADD_MENU);
       return;
     }
     setFocusId(review.addComment(pageKey, "", result.dataUrl));
@@ -246,9 +203,9 @@ export function ReviewPanel({
     setCaptureTarget("element");
     const result = await captureElement(host);
     setCaptureTarget(null);
-    if (!result) return;
-    if ("error" in result) {
-      setToast(`Element not captured: ${result.error}`);
+    if (!result || "error" in result) {
+      if (result) setToast(`Element not captured: ${result.error}`);
+      returnFocus(ADD_MENU);
       return;
     }
     setFocusId(review.addComment(pageKey, "", result.dataUrl, result.element));
@@ -279,19 +236,36 @@ export function ReviewPanel({
     review.duplicateComment(pageKey, comment);
   };
 
+  // Download report: save what the reviewer entered (name and email under
+  // their own keys, session details in the session, as before), then build
+  // the report from exactly those values.
+  const downloadWith = (values: ReportDetails) => {
+    review.setUserName(values.userName);
+    review.setUserEmail(values.userEmail);
+    if (session && values.details !== session.details)
+      review.setDetails(values.details);
+    downloadReport({
+      session: session ? { ...session, details: values.details } : session,
+      userName: values.userName,
+      userEmail: values.userEmail,
+    });
+    setDownloadOpen(false);
+    returnFocus("[data-download]", ADD_MENU);
+  };
+
   const closeEditor = (id: number) => {
     setAnnotateId(null);
-    returnFocus(`[data-shot-edit="${id}"]`, ACTIVE_TAB);
+    returnFocus(`[data-shot-edit="${id}"]`, ADD_MENU);
   };
 
   const cancelConfirmation = () => {
     const current = confirmation;
     setConfirmation(null);
     if (current?.kind === "delete-comment")
-      returnFocus(`[data-row-menu="${current.comment.id}"]`, NEW_COMMENT);
+      returnFocus(`[data-row-menu="${current.comment.id}"]`, ADD_MENU);
     else if (current?.kind === "delete-screenshot")
-      returnFocus(`[data-shot-edit="${current.comment.id}"]`, NEW_COMMENT);
-    else returnFocus("[data-start-over]", ACTIVE_TAB);
+      returnFocus(`[data-shot-edit="${current.comment.id}"]`, ADD_MENU);
+    else returnFocus("[data-start-over]", ADD_MENU);
   };
 
   const confirm = () => {
@@ -302,7 +276,7 @@ export function ReviewPanel({
       review.deleteComment(pageKey, current.comment.id);
       // The comment and its menu are gone; the add field is the nearest
       // place to continue.
-      returnFocus(NEW_COMMENT, ACTIVE_TAB);
+      returnFocus(ADD_MENU);
     } else if (current.kind === "delete-screenshot") {
       review.updateComment(
         pageKey,
@@ -310,11 +284,11 @@ export function ReviewPanel({
         { screenshot: null },
         "now",
       );
-      returnFocus(`[data-shot-add="${current.comment.id}"]`, NEW_COMMENT);
+      returnFocus(`[data-shot-add="${current.comment.id}"]`, ADD_MENU);
     } else {
       review.startOver();
       // Start over is disabled now there is no session.
-      returnFocus(NEW_COMMENT, ACTIVE_TAB);
+      returnFocus(ADD_MENU);
     }
   };
 
@@ -327,13 +301,14 @@ export function ReviewPanel({
           "Deletes every comment and screenshot on every page. The reviewer's name and email stay. This can't be undone.",
         confirmLabel: "Start over",
       };
-    const id = formatCommentId(confirmation.comment.commentNumber);
+    const id = commentName(confirmation.comment.commentNumber);
+    const Id = commentName(confirmation.comment.commentNumber, true);
     if (confirmation.kind === "delete-comment")
       return {
         title: `Delete ${id}`,
         consequence: confirmation.comment.screenshot
-          ? `Deletes ${id} and its screenshot. This can't be undone.`
-          : `Deletes ${id}. This can't be undone.`,
+          ? `${Id} and its screenshot will be deleted. This can't be undone.`
+          : `${Id} will be deleted. This can't be undone.`,
         confirmLabel: "Delete comment",
       };
     return {
@@ -344,11 +319,7 @@ export function ReviewPanel({
   })();
 
   return (
-    <div
-      className="art-panel"
-      onKeyDown={onKeyDown}
-      style={{ "--art-pinned-top": `${tabsBarHeight}px` } as CSSProperties}
-    >
+    <div className="art-panel" onKeyDown={onKeyDown}>
       <ResizeHandle
         width={width}
         onChange={onWidthChange}
@@ -378,98 +349,61 @@ export function ReviewPanel({
         closeOnEscape={false}
         withinPortal={false}
         returnFocus={false}
-        // The product name, in sentence case. The version lives at the
-        // bottom of the Help tab.
+        // The product name, in sentence case. The version is not shown in
+        // the panel (the browser's extension details show it); it is in the
+        // report's hidden metadata.
         title="Snippy"
         closeButtonProps={{ "aria-label": "Close Snippy" }}
-        onEnterTransitionEnd={() => newCommentRef.current?.focus()}
+        onEnterTransitionEnd={() => findInPanel(host, ADD_MENU)?.focus()}
         onExitTransitionEnd={finishClose}
       >
-        <Tabs value={tab} onChange={setTab}>
-          {/* The tab bar stays pinned while the tab content scrolls. */}
-          <div className="art-pinned art-pinned-tabs" ref={tabsBarRef}>
-            <Tabs.List>
-              <Tabs.Tab value="comments">Comments</Tabs.Tab>
-              <Tabs.Tab value="reviewer">Reviewer</Tabs.Tab>
-              <Tabs.Tab value="help">Help</Tabs.Tab>
-            </Tabs.List>
-          </div>
-          <Tabs.Panel value="comments">
-            <CommentsTab
-              review={review}
-              pageKey={pageKey}
-              comments={pageComments}
-              formLayout={formLayout}
-              newCommentRef={newCommentRef}
-              draft={draft}
-              onDraftChange={setDraft}
-              totalCount={total}
-              focusId={focusId}
-              onFocused={() => setFocusId(null)}
-              capturing={capturing}
-              captureTarget={captureTarget}
-              onAddComment={handleAddComment}
-              onAddScreenshot={handleAddScreenshot}
-              onAddElement={handleAddElement}
-              onAddScreenshotTo={handleAddScreenshotTo}
-              onDuplicate={handleDuplicate}
-              onRequestDelete={(comment) =>
-                setConfirmation({ kind: "delete-comment", comment })
-              }
-              onAnnotate={(comment) => setAnnotateId(comment.id)}
-            />
-          </Tabs.Panel>
-          <Tabs.Panel value="reviewer">
-            <ReviewerTab review={review} formLayout={formLayout} />
-          </Tabs.Panel>
-          <Tabs.Panel value="help">
-            <HelpTab />
-          </Tabs.Panel>
-        </Tabs>
+        <CommentList
+          review={review}
+          pageKey={pageKey}
+          comments={pageComments}
+          formLayout={formLayout}
+          focusId={focusId}
+          onFocused={() => setFocusId(null)}
+          capturing={capturing}
+          captureTarget={captureTarget}
+          onAddComment={handleAddComment}
+          onAddScreenshot={handleAddScreenshot}
+          onAddElement={handleAddElement}
+          onAddScreenshotTo={handleAddScreenshotTo}
+          onDuplicate={handleDuplicate}
+          onRequestDelete={(comment) =>
+            setConfirmation({ kind: "delete-comment", comment })
+          }
+          onAnnotate={(comment) => setAnnotateId(comment.id)}
+        />
 
         {/*
           No save-status text (an approved exception to the autosave
           status rule): saving is silent, and only a failure is reported,
           as a toast.
         */}
+        {/* Buttons only, no text (owner decision). */}
         <Panel.Footer>
-          <Stack gap="rec-sm" w="100%">
-            {/* Always present, so it never changes the footer's height: what
-              the report and Start over act on, which is also why they are
-              disabled when there is nothing yet. */}
-            <Stack maw={300}>
-              <Text variant="caption" emphasis="low">
-                {total === 0
-                  ? session
-                    ? "Report: no comments yet"
-                    : "Add a comment to start a session"
-                  : `Report and Start over: ${plural(total, "comment", "comments")} across ${plural(pageCount, "page", "pages")}`}
-              </Text>
-            </Stack>
-            <Group justify="space-between" wrap="nowrap" gap="rec-sm" w="100%">
-              <Button
-                variant="text"
-                disabled={!session}
-                data-start-over="true"
-                onClick={() => setConfirmation({ kind: "start-over" })}
-              >
-                Start over
-              </Button>
-              <Button
-                variant="solid"
-                disabled={total === 0}
-                onClick={() =>
-                  downloadReport({
-                    session,
-                    userName: review.userName,
-                    userEmail: review.userEmail,
-                  })
-                }
-              >
-                Download report
-              </Button>
-            </Group>
-          </Stack>
+          <Group justify="space-between" wrap="nowrap" gap="rec-sm" w="100%">
+            <Button
+              variant="text"
+              size="small"
+              disabled={!session}
+              data-start-over="true"
+              onClick={() => setConfirmation({ kind: "start-over" })}
+            >
+              Start over
+            </Button>
+            <Button
+              variant="solid"
+              size="small"
+              disabled={total === 0}
+              data-download="true"
+              onClick={() => setDownloadOpen(true)}
+            >
+              Download report
+            </Button>
+          </Group>
         </Panel.Footer>
       </Panel>
 
@@ -507,6 +441,20 @@ export function ReviewPanel({
         onCancel={cancelConfirmation}
         onConfirm={confirm}
       />
+      {downloadOpen && (
+        <DownloadModal
+          initial={{
+            userName: review.userName,
+            userEmail: review.userEmail,
+            details: session?.details ?? "",
+          }}
+          onCancel={() => {
+            setDownloadOpen(false);
+            returnFocus("[data-download]", ADD_MENU);
+          }}
+          onDownload={downloadWith}
+        />
+      )}
       {annotateComment?.screenshot && (
         <AnnotationEditor
           comment={{

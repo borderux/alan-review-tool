@@ -452,3 +452,27 @@ export function serializeElement(
     screenshotClipped,
   };
 }
+
+// A short, human summary of a captured element for the panel: its tag plus
+// its id, or else its first class - `td`, `button.primary`, `div#main`.
+// Read from the stored HTML's opening tag, so it works for elements
+// captured before this summary existed. Capped at 40 characters; the full
+// selector path is only in the report.
+const SUMMARY_CAP = 40;
+
+export function elementSummary(el: CapturedElement): string {
+  const open = /^<([a-zA-Z][\w-]*)([^>]*)>/.exec(el.html);
+  if (!open) return "element";
+  const tagName = open[1].toLowerCase();
+  const attrs = open[2];
+  const id = /\sid\s*=\s*"([^"]+)"/.exec(attrs)?.[1];
+  const firstClass = /\sclass\s*=\s*"\s*([^"\s]+)/.exec(attrs)?.[1];
+  const summary = id
+    ? `${tagName}#${id}`
+    : firstClass
+      ? `${tagName}.${firstClass}`
+      : tagName;
+  return summary.length > SUMMARY_CAP
+    ? `${summary.slice(0, SUMMARY_CAP - 1)}…`
+    : summary;
+}

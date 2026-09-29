@@ -121,8 +121,8 @@ export function useReviewSession({
   useEffect(() => flush, [flush]);
 
   // Creates a comment at the top of the page's list (newest first) and
-  // returns its id. The CM-<n> counter only ever goes up, even across
-  // deletes: CM-<n> plus the session guid is a permanent id.
+  // returns its id. The comment number only ever goes up, even across
+  // deletes: the number plus the session guid is a permanent id.
   const addComment = useCallback(
     (
       pageKey: string,
