@@ -1,11 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FocusEvent, MutableRefObject } from "react";
-import { Camera, Trash } from "@phosphor-icons/react";
+import { Camera, DotsThree } from "@phosphor-icons/react";
 import {
   Button,
   Group,
+  Heading,
+  Menu,
   Stack,
-  Text,
   TextArea,
   Tooltip,
 } from "@recursica/adapter-mantine-v8";
@@ -17,7 +18,6 @@ interface CommentItemProps {
   comment: ReviewComment;
   formLayout: FormLayout;
   capturingScreenshot: boolean;
-  deletedScreenshot: boolean;
   autoFocus: boolean;
   onFocused: () => void;
   capturing: MutableRefObject<boolean>;
@@ -26,18 +26,23 @@ interface CommentItemProps {
   onDelete: () => void;
   onDuplicate: () => void;
   onAddScreenshot: () => void;
-  onEditScreenshot: () => void;
-  onUndoScreenshot: () => void;
+  onAnnotate: () => void;
 }
 
-// One comment, as a stacked field group: its text, then its screenshot
-// and its actions. No card - a form control never goes inside one; space
-// separates each comment from the next.
+// One comment. Every comment is the same stored record - text, plus an
+// optional screenshot - shown as one of two kinds of row:
+//
+// - a quick comment: one line of text that grows only as the text does,
+//   with a visible Add screenshot action;
+// - a screenshot comment: the thumbnail, Add annotations, and the text.
+//
+// Each row is a group: its CM-<n> heading, then its parts, with a divider
+// line between groups (see panel.css). No card: a form control never goes
+// inside one.
 export function CommentItem({
   comment,
   formLayout,
   capturingScreenshot,
-  deletedScreenshot,
   autoFocus,
   onFocused,
   capturing,
@@ -46,11 +51,39 @@ export function CommentItem({
   onDelete,
   onDuplicate,
   onAddScreenshot,
-  onEditScreenshot,
-  onUndoScreenshot,
+  onAnnotate,
 }: CommentItemProps) {
   const id = formatCommentId(comment.commentNumber);
   const textRef = useRef<HTMLTextAreaElement>(null);
+  const firstMenuItemRef = useRef<HTMLButtonElement>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuWasOpen = useRef(false);
+
+  // Menu focus is managed here rather than by the library, whose own focus
+  // handling does not work inside a shadow root. Focus moves onto the
+  // first item once the items have rendered, and back to the trigger when
+  // the menu closes - unless an item opened a modal, which then owns
+  // focus. Tab leaves the menu.
+  useEffect(() => {
+    if (menuOpen) {
+      menuWasOpen.current = true;
+      const frame = requestAnimationFrame(() =>
+        firstMenuItemRef.current?.focus(),
+      );
+      return () => cancelAnimationFrame(frame);
+    }
+    if (!menuWasOpen.current) return;
+    menuWasOpen.current = false;
+    const frame = requestAnimationFrame(() => {
+      const trigger = menuTriggerRef.current;
+      const root = trigger?.getRootNode() as ShadowRoot | undefined;
+      const inModal = root?.activeElement?.closest(".mantine-Modal-content");
+      if (trigger && !inModal) trigger.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [menuOpen]);
+  const hasShot = Boolean(comment.screenshot);
 
   // A comment that was just created (or duplicated, or had a screenshot
   // added) takes focus, with the cursor at the end of its text.
@@ -62,62 +95,23 @@ export function CommentItem({
     onFocused();
   }, [autoFocus, onFocused]);
 
-  // Starting a comment and then leaving it without adding anything
-  // shouldn't leave an empty entry behind. Focus moving to this comment's
-  // own buttons isn't leaving it, and neither is the panel hiding itself
-  // for a screenshot.
+  // A comment left with no text and no screenshot vanishes silently.
+  // Focus moving to this comment's own controls isn't leaving it, and
+  // neither is the panel hiding itself for a screenshot.
   const onBlur = (event: FocusEvent<HTMLLIElement>) => {
     if (capturing.current) return;
     const next = event.relatedTarget as Node | null;
     if (next && event.currentTarget.contains(next)) return;
-    if (!comment.text.trim() && !comment.screenshot && !deletedScreenshot)
-      onLeftEmpty();
+    if (!comment.text.trim() && !comment.screenshot) onLeftEmpty();
   };
 
   return (
-    <li onBlur={onBlur}>
+    <li className="art-row" onBlur={onBlur}>
       <Stack gap="rec-sm">
-        <TextArea
-          ref={textRef}
-          label={`Comment ${id}`}
-          {...fieldLayout(formLayout)}
-          autosize
-          minRows={2}
-          value={comment.text}
-          onChange={(event) => onTextChange(event.currentTarget.value)}
-        />
         <Group justify="space-between" wrap="nowrap" gap="rec-sm">
+          <Heading order={3}>{id}</Heading>
           <Group gap="rec-sm" wrap="nowrap">
-            {comment.screenshot ? (
-              <>
-                {/* Decorative: the button beside it names the screenshot. */}
-                <img className="art-thumb" src={comment.screenshot} alt="" />
-                {/* Edit, not View: the screenshot opens where it can be
-                    drawn on and deleted. */}
-                <Button
-                  variant="outline"
-                  size="small"
-                  aria-label={`Edit screenshot for ${id}`}
-                  data-shot-edit={comment.id}
-                  onClick={onEditScreenshot}
-                >
-                  Edit screenshot
-                </Button>
-              </>
-            ) : deletedScreenshot ? (
-              <>
-                <Text variant="body-small">Screenshot deleted</Text>
-                <Button
-                  variant="text"
-                  size="small"
-                  aria-label={`Undo screenshot delete for ${id}`}
-                  data-shot-undo={comment.id}
-                  onClick={onUndoScreenshot}
-                >
-                  Undo
-                </Button>
-              </>
-            ) : (
+            {!hasShot && (
               <Tooltip label="Add screenshot">
                 <Button
                   variant="outline"
@@ -125,67 +119,80 @@ export function CommentItem({
                   icon={<Camera />}
                   loading={capturingScreenshot}
                   aria-label={`Add screenshot to ${id}`}
+                  data-shot-add={comment.id}
                   onClick={onAddScreenshot}
                 />
               </Tooltip>
             )}
-          </Group>
-          <Group gap="rec-sm" wrap="nowrap">
-            <Button
-              variant="text"
-              size="small"
-              aria-label={`Duplicate ${id}`}
-              onClick={onDuplicate}
-            >
-              Duplicate
-            </Button>
-            <Tooltip label="Delete comment">
-              <Button
-                variant="text"
-                size="small"
-                icon={<Trash />}
-                aria-label={`Delete comment ${id}`}
-                onClick={onDelete}
-              />
-            </Tooltip>
+            <Menu trapFocus={false} opened={menuOpen} onChange={setMenuOpen}>
+              <Tooltip label="More actions">
+                <Menu.Target>
+                  <Button
+                    variant="outline"
+                    size="small"
+                    icon={<DotsThree />}
+                    ref={menuTriggerRef}
+                    aria-label={`More actions for ${id}`}
+                    data-row-menu={comment.id}
+                  />
+                </Menu.Target>
+              </Tooltip>
+              {/* Tab leaves the menu: it closes, and focus goes back to
+                  the trigger like every other way of closing it. */}
+              <Menu.Dropdown
+                onKeyDown={(event) => {
+                  if (event.key !== "Tab") return;
+                  event.preventDefault();
+                  setMenuOpen(false);
+                }}
+              >
+                <Menu.Item ref={firstMenuItemRef} onClick={onDuplicate}>
+                  Duplicate comment
+                </Menu.Item>
+                <Menu.Item onClick={onDelete}>Delete comment</Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
           </Group>
         </Group>
+
+        {hasShot && (
+          <Group gap="rec-sm" wrap="nowrap">
+            {/* Decorative: the button beside it names the screenshot. */}
+            <img
+              className="art-thumb"
+              src={comment.screenshot ?? undefined}
+              alt=""
+            />
+            <Button
+              variant="outline"
+              size="small"
+              aria-label={`Add annotations to ${id}`}
+              data-shot-edit={comment.id}
+              onClick={onAnnotate}
+            >
+              Add annotations
+            </Button>
+          </Group>
+        )}
+
+        <TextArea
+          ref={textRef}
+          // The label names the comment on its own, id included: the
+          // adapter labels the field by its visible label, so an
+          // aria-label cannot add the id.
+          label={`Comment ${id}`}
+          {...fieldLayout(formLayout)}
+          autosize
+          minRows={1}
+          placeholder={
+            hasShot
+              ? "Describe what the screenshot shows"
+              : "Describe the issue or change"
+          }
+          value={comment.text}
+          onChange={(event) => onTextChange(event.currentTarget.value)}
+        />
       </Stack>
-    </li>
-  );
-}
-
-interface DeletedCommentItemProps {
-  comment: ReviewComment;
-  onUndo: () => void;
-}
-
-// Where a deleted comment was: its delete control has become an Undo, in
-// the same place. Focus moves to the Undo, since the button that had focus
-// no longer exists.
-export function DeletedCommentItem({
-  comment,
-  onUndo,
-}: DeletedCommentItemProps) {
-  const id = formatCommentId(comment.commentNumber);
-  const undoRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    undoRef.current?.focus();
-  }, []);
-  return (
-    <li>
-      <Group justify="space-between" wrap="nowrap" gap="rec-sm">
-        <Text variant="body-small">{id} deleted</Text>
-        <Button
-          ref={undoRef}
-          variant="text"
-          size="small"
-          aria-label={`Undo delete of ${id}`}
-          onClick={onUndo}
-        >
-          Undo
-        </Button>
-      </Group>
     </li>
   );
 }

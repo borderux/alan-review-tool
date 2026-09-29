@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { MantineProvider, Portal, Tooltip, createTheme } from "@mantine/core";
 import { Layer } from "@recursica/adapter-mantine-v8";
+import { ModalPortalContext } from "./modalPortal";
 import { ReviewPanel } from "./ReviewPanel";
 import type { StoredState } from "./lib/storage";
 import { useColorScheme } from "./useColorScheme";
@@ -9,6 +10,7 @@ interface AppProps {
   host: HTMLElement;
   rootEl: HTMLElement;
   portalEl: HTMLElement;
+  modalPortalEl: HTMLElement;
   stored: StoredState;
   onClosed: () => void;
 }
@@ -24,7 +26,14 @@ function pageRemScale(): number {
   return rootPx > 0 ? 16 / rootPx : 1;
 }
 
-export function App({ host, rootEl, portalEl, stored, onClosed }: AppProps) {
+export function App({
+  host,
+  rootEl,
+  portalEl,
+  modalPortalEl,
+  stored,
+  onClosed,
+}: AppProps) {
   const scheme = useColorScheme(rootEl);
 
   const theme = useMemo(
@@ -58,15 +67,20 @@ export function App({ host, rootEl, portalEl, stored, onClosed }: AppProps) {
       {/* Layer 0, declared once, on the panel's root. The adapter's
           RecursicaThemeProvider is not used - see mount.tsx. */}
       <Layer layer={0}>
-        <ReviewPanel
-          host={host}
-          portalEl={portalEl}
-          stored={stored}
-          onClosed={onClosed}
-        />
+        <ModalPortalContext.Provider value={modalPortalEl}>
+          <ReviewPanel
+            host={host}
+            portalEl={portalEl}
+            stored={stored}
+            onClosed={onClosed}
+          />
+        </ModalPortalContext.Provider>
         <div
           ref={(el) => {
-            if (el && portalEl.parentElement !== el) el.appendChild(portalEl);
+            if (!el) return;
+            if (portalEl.parentElement !== el) el.appendChild(portalEl);
+            if (modalPortalEl.parentElement !== el)
+              el.appendChild(modalPortalEl);
           }}
         />
       </Layer>

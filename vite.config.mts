@@ -26,7 +26,7 @@ const PANEL_ROOT_CLASS = "art-root";
 // from the host page's real root font size at mount (see theme.ts).
 function shadowScope(): AcceptedPlugin {
   return {
-    postcssPlugin: "alan-shadow-scope",
+    postcssPlugin: "tagger-shadow-scope",
     Rule(rule: Rule) {
       if (rule.selector.includes(":root")) {
         rule.selector = rule.selector.replace(
@@ -56,7 +56,7 @@ const themeCssPath = path.join(
 
 function versionDefine(): VitePlugin {
   return {
-    name: "alan-version",
+    name: "tagger-version",
     config: () => ({ define: { __APP_VERSION__: JSON.stringify(version) } }),
   };
 }
@@ -82,7 +82,7 @@ export default defineConfig({
     lib: {
       entry: path.join(rootDir, "src/content/main.tsx"),
       formats: ["iife"],
-      name: "AlanReviewTool",
+      name: "Tagger",
       fileName: () => "content.js",
     },
     // Fonts and other assets are inlined into content.js rather than

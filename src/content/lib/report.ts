@@ -1,11 +1,11 @@
 // Builds the downloaded report: a single self-contained HTML file with no
 // external requests and zero JavaScript (the screenshot lightbox is pure
-// CSS, using :target). Out of scope for the React refactor - this is the
-// pre-React report builder, moved here unchanged. report.css and the AI
-// instructions are inlined at build time because a downloaded standalone
-// file cannot fetch a sibling file.
+// CSS, using :target). report.css and the AI instructions are inlined at
+// build time because a downloaded standalone file cannot fetch a sibling
+// file. Dates and counts use the panel's shared formatters.
 import REPORT_CSS from "../../report.css?raw";
 import AI_INSTRUCTIONS from "../../ai-report-instructions.txt?raw";
+import { formatDateTimeWithZone, plural } from "./format";
 import { formatCommentId } from "./ids";
 import type { Session } from "./types";
 
@@ -92,15 +92,15 @@ ${commentsHtml}
 <html>
 <head>
 <meta charset="utf-8">
-<title>Feedback session</title>
-${session?.guid ? `<meta name="alan-review-session-id" content="${escapeHtml(session.guid)}">` : ""}
+<title>Tagger feedback session</title>
+${session?.guid ? `<meta name="tagger-session-id" content="${escapeHtml(session.guid)}">` : ""}
 <meta name="ai-report-instructions" content="${escapeHtml(AI_INSTRUCTIONS)}">
 <style>${REPORT_CSS}</style>
 </head>
 <body>
 <div class="report-header">
-<h1>Feedback session</h1>
-<p class="report-meta">Started ${session ? new Date(session.startedAt).toLocaleString() : "-"} — ${totalCount} comment${totalCount === 1 ? "" : "s"} across ${pageCount} page${pageCount === 1 ? "" : "s"}</p>
+<h1>Tagger feedback session</h1>
+<p class="report-meta">Started ${session ? formatDateTimeWithZone(session.startedAt) : "-"} — ${plural(totalCount, "comment", "comments")} across ${plural(pageCount, "page", "pages")}</p>
 ${userName ? `<p class="report-meta">Reviewer: ${escapeHtml(userName)}</p>` : ""}
 ${userEmail ? `<p class="report-meta">Email: ${escapeHtml(userEmail)}</p>` : ""}
 ${session?.details ? `<p class="report-meta">Details: ${escapeHtml(session.details)}</p>` : ""}
@@ -123,7 +123,7 @@ export function downloadReport(input: ReportInput): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `alan-review-session-${Date.now()}.html`;
+  a.download = `tagger-session-${Date.now()}.html`;
   a.click();
   URL.revokeObjectURL(url);
 }

@@ -1,7 +1,8 @@
 /* The panel's own rules. Deliberately few: everything visual comes from
    Recursica components and the theme. What remains is layout for elements
    that no component covers - each one is listed as a gap in the pull
-   request that introduced it. */
+   request that introduced it. Where a value is needed it is read from a
+   theme token, never hand-set, except the pen colours (see below). */
 
 /* The shadow root's top element. `:root` in Mantine's and the theme's
    stylesheets is rewritten to this class at build time. The base font
@@ -29,14 +30,13 @@
   outline: auto;
 }
 
-/* Where tooltips and modals render. Mantine's modal positions itself as
-   position: fixed with no left offset, which relies on sitting at the
-   viewport's left edge - true in document.body, where Mantine normally
-   portals, but not inside the panel's host on the right. Pinning the
-   portal container to the viewport's top-left corner restores that.
-   Being fixed, it is also its own stacking context, so it sits above the
-   panel (and its resize strip): a modal's backdrop must cover the panel,
-   and a tooltip must never render underneath it. */
+/* Where tooltips, menus, the toast and modals render. Mantine's modal
+   positions itself as position: fixed with no left offset, which relies on
+   sitting at the viewport's left edge - true in document.body, where
+   Mantine normally portals, but not inside the panel's host on the right.
+   Pinning the portal container to the viewport's top-left corner restores
+   that. Being fixed, it is also its own stacking context, so it sits above
+   the panel (and its resize strip). */
 .art-portal {
   position: fixed;
   top: 0;
@@ -44,12 +44,50 @@
   z-index: 1001;
 }
 
-/* The logo beside the panel title. No image component exists in the kit. */
-.art-logo {
-  display: block;
-  height: 32px;
-  width: auto;
-  flex-shrink: 0;
+/* The parts of the panel that stay put while the tab content scrolls: the
+   tab bar, and the Comments tab's add controls. The panel body is the one
+   scroll container (the approved scroll exception); these stick to its
+   top. They need an opaque background so content scrolls underneath them,
+   taken from the panel's own background token. The add controls stick
+   just below the tab bar, whose height is measured into --art-pinned-top.
+   No kit component pins part of a panel, so this is a reported gap. */
+.art-pinned {
+  position: sticky;
+  z-index: 2;
+  background-color: var(
+    --recursica_ui-kit_components_panel_properties_colors_background-color
+  );
+}
+/* The tab bar sticks at the very top of the panel body, covering the
+   body's own top padding too: a sticky element otherwise stops below that
+   padding, and rows would show through the gap above it. The negative
+   margin keeps its resting position unchanged. */
+.art-pinned-tabs {
+  top: calc(
+    var(
+        --recursica_ui-kit_components_panel_properties_content-vertical-padding
+      ) *
+      -1
+  );
+  margin-top: calc(
+    var(
+        --recursica_ui-kit_components_panel_properties_content-vertical-padding
+      ) *
+      -1
+  );
+  padding-top: var(
+    --recursica_ui-kit_components_panel_properties_content-vertical-padding
+  );
+}
+/* The add controls stick directly below it. */
+.art-pinned-below-tabs {
+  top: calc(
+    var(--art-pinned-top, 0px) -
+      var(
+        --recursica_ui-kit_components_panel_properties_content-vertical-padding
+      )
+  );
+  padding-bottom: var(--recursica_brand_dimensions_general_default);
 }
 
 /* A comment's screenshot thumbnail. No image or thumbnail component
@@ -61,17 +99,42 @@
   object-fit: cover;
 }
 
-/* The screenshot and its drawing layer inside the screenshot modal. The
-   canvas sits exactly over the image, in the image's own natural-
-   resolution coordinate space. */
+/* The comment list: one group per comment, separated by a divider line
+   that reuses the panel's own divider tokens (the same line that separates
+   its header and footer). The kit has no divider component. The space
+   inside a group comes from its Stack; the space between groups is the
+   list's own gap plus this padding, so groups sit further apart than the
+   parts inside them. */
+.art-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.art-row + .art-row {
+  border-top: var(--recursica_ui-kit_components_panel_properties_divider-size)
+    solid
+    var(--recursica_ui-kit_components_panel_properties_colors_divider-color);
+  padding-top: var(--recursica_brand_dimensions_general_lg);
+}
+
+/* Help tab list. */
+.art-bullets {
+  margin: 0;
+  padding-left: var(--recursica_brand_dimensions_general_lg);
+}
+
+/* The screenshot and its two drawing layers in the annotation editor. The
+   canvases sit exactly over the image, in the image's own natural-
+   resolution coordinate space: the outline layer under the stroke layer,
+   so every stroke has a thin contrasting edge. */
 .art-shot {
   position: relative;
   display: inline-block;
-  /* Shrink to the image inside the modal's column layout, so the drawing
-     layer covers the image exactly and nothing beside it. */
-  align-self: flex-start;
   line-height: 0;
   max-width: 100%;
+  /* Shrink to the image inside a flex layout, so the drawing layers cover
+     the image exactly and nothing beside it. */
+  align-self: flex-start;
 }
 .art-shot img {
   display: block;
@@ -86,6 +149,26 @@
   cursor: crosshair;
   touch-action: none;
 }
+/* The outline layer only shows strokes; the stroke layer above it takes
+   the pointer. */
+.art-shot canvas[aria-hidden] {
+  pointer-events: none;
+}
+
+/* Pen colour swatches beside each colour's name. These colours are baked
+   into the screenshot, so they are fixed values that cannot follow the
+   theme; the name in each label carries the meaning, and the radio's own
+   selected state shows the choice. The border keeps white and black
+   swatches visible on either theme. */
+.art-swatch {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid #767676;
+  vertical-align: middle;
+  margin-right: var(--recursica_brand_dimensions_general_sm);
+}
 
 /* Where a toast appears: over the page, at its bottom-left, so it never
    changes the height of anything. Not inside the panel: the theme's toast
@@ -96,11 +179,4 @@
   position: fixed;
   left: var(--recursica_brand_dimensions_general_xl);
   bottom: var(--recursica_brand_dimensions_general_xl);
-}
-
-/* A list with no markers, for the comment list. */
-.art-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
 }

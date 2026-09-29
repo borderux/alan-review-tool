@@ -2,7 +2,7 @@
 
 ## Overview
 
-Alan Review Tool is a Manifest V3 browser extension (Chrome and Firefox) that
+Tagger is a Manifest V3 browser extension (Chrome and Firefox) that
 lets a reviewer leave text comments and screenshots on any website, without
 that site needing to embed anything. Feedback is grouped into a single
 **session** spanning every page the reviewer visits, and exported as a
@@ -36,10 +36,11 @@ Recursica design system and bundled by Vite into one content script;
     the Recursica layer-0 scope.
   - `ReviewPanel.tsx` - the panel shell: open/close, Escape, focus, tabs,
     footer, toast and modals.
-  - `components/` - the tabs (Comments, Session, Help), a comment, the
-    screenshot and clear-session modals, the title, the resize strip.
-  - `useReviewSession.ts` - all session state, saving, and the in-memory
-    undo buffers.
+  - `components/` - the tabs (Comments, Reviewer, Help), a comment row
+    with its action menu, the annotation editor, the shared confirmation
+    modal, the resize strip.
+  - `useReviewSession.ts` - all session state and saving.
+  - `modalPortal.ts` - hands every modal its layer-1 portal container.
   - `lib/` - framework-free modules: storage and migration, page push,
     screenshot capture, the report builder, ids, formatting.
   - `styles.ts`, `panel.css`, `fonts.ts` - see
@@ -58,9 +59,9 @@ no blanket `host_permissions`. `content.js` only ever runs because the user
 clicked the toolbar icon, which is what makes `activeTab` sufficient.
 
 Each click re-injects `content.js` from scratch. `main.tsx` starts by
-checking for an existing panel host (`#alan-review-tool-host`):
+checking for an existing panel host (`#tagger-host`):
 
-- **Found → close.** It dispatches a cancelable `alan-review-tool:close`
+- **Found → close.** It dispatches a cancelable `tagger:close`
   event on the host. The script instance that owns the panel listens for
   it, calls `preventDefault()`, saves anything still pending, slides the
   panel out, then unmounts React, removes the host and restores the page.
@@ -72,6 +73,12 @@ Anything that must survive a close/reopen lives outside the script:
 `chrome.storage.local` for session data, panel width and reviewer identity;
 `data-*` attributes on `document.documentElement` for the page's own
 pre-panel inline styles and the fonts-registered flag.
+
+While a screenshot region is being selected, the panel is hidden and the
+page gets its full width back (`withPanelAway()` in `lib/capture.ts`), so
+there is no blank strip and the capture covers the page as it really lays
+out; the panel and the push come back afterwards on every path - success,
+cancel or failure.
 
 The panel **pushes** the page rather than overlaying it: opening the panel
 shrinks `document.documentElement`'s width (with a transition) instead of
@@ -110,9 +117,16 @@ Mantine- and Recursica-based UI to work there takes five things:
    `Layer`, just inside it.
 4. **Portals stay inside the shadow root.** Mantine's `Portal` defaults to
    `document.body`, which would leave tooltips and modals unstyled. The
-   theme points every portal at `.art-portal`, a container inside the
-   layer-0 scope pinned to the viewport's top-left corner (Mantine's modal
-   positions itself assuming that) and stacked above the panel.
+   theme points every portal (tooltips, menus, the toast) at `.art-portal`,
+   a container inside the layer-0 scope pinned to the viewport's top-left
+   corner (Mantine's modal positions itself assuming that) and stacked
+   above the panel. Modals use a second container of the same kind that
+   declares `data-recursica-layer="1"`, so every modal sits on layer 1.
+   It is a plain element carrying the attribute rather than the adapter's
+   `Layer` component, because `Layer` paints its own padded surface.
+   Mantine's focus return (modals and menus) records
+   `document.activeElement`, which inside a shadow root is the host, so the
+   panel moves focus itself.
 5. **Fonts on the document.** Chrome ignores `@font-face` inside a shadow
    root, so `fonts.ts` adds the theme's two typefaces (Dongle, Nunito
    Sans - bundled from Fontsource, inlined into `content.js`) to the host
@@ -127,7 +141,7 @@ extension package on each click, never downloaded.
 ## Data model
 
 Everything lives under one `chrome.storage.local` key
-(`alanReviewToolSession`), not one entry per comment or per page - a content
+(`taggerSession`), not one entry per comment or per page - a content
 script's own page-scoped `localStorage` is isolated per origin, which would
 defeat the entire "any site, one session" pitch.
 
@@ -151,20 +165,41 @@ session = {
 ```
 
 The types live in `src/content/lib/types.ts`. Reviewer identity
-(`alanReviewToolUser`, `alanReviewToolEmail`) and the panel's width
-(`alanReviewToolPanelWidth`) are stored under **separate** keys and never
-cleared by "Clear session" - they're identity/preference facts, not session
-data.
+(`taggerUser`, `taggerEmail`), the panel's width (`taggerPanelWidth`) and
+the annotation pen's last colour (`taggerPenColor`) are stored under
+**separate** keys and never cleared by "Start over" - they're
+identity/preference facts, not session data. The unsent text in the New
+comment field is kept under `taggerDraft`, so closing the panel never
+loses it; adding the comment clears it.
+
+The page key is the address the panel is on right now. Single-page apps
+change it without a reload, and a content script can't see the page's own
+history calls, so `usePageKey()` re-reads it on a short interval; comments
+added after an in-app navigation are filed under the new address.
+
+There is one kind of stored comment: text plus an optional screenshot. The
+panel shows it as a quick comment (text only) or a screenshot comment
+(thumbnail, Add annotations, text), depending on whether it has a
+screenshot; the stored record is the same either way.
+
+**The storage keys were renamed** with the product, from `alanReviewTool*`
+to `tagger*`. `migrateStorageKeys()` runs before anything reads storage:
+for each old key that exists, it copies the value to the new key unless the
+new key already exists (the new key always wins), then deletes the old key.
+The copied session still goes through `migrateSession()` below, so an old
+array-shaped session is normalized as well. A panel left open by the old
+version (`#alan-review-tool-host`) is closed on the next click, restoring
+the page from the old dataset names.
 
 Saving: structural changes (a new, deleted or duplicated comment, a
-capture, a clear) save at once; typing saves after a 400 ms pause, and
-anything still pending is written when the panel closes. The footer shows a
-persistent save status, including the time of the last save. Every write's
-promise is tracked: a failed write (the storage quota is reachable, since
-screenshots live in the session) turns the status to "Changes not saved"
-and raises a toast with the browser's reason. Deleting a comment or a screenshot writes to
-storage immediately; the Undo that replaces its delete control is held in
-memory only, until the panel closes, so it never changes the stored shape.
+capture, a start over) save at once; typing saves after a 400 ms pause,
+and anything still pending is written when the panel closes. Saving is
+silent - the panel shows no save status, an approved exception to the
+autosave-status rule - but every write's promise is tracked, and a failed
+write (the storage quota is reachable, since screenshots live in the
+session) raises a toast with the browser's reason. Deleting a comment, a
+screenshot, or the whole session asks for confirmation first, in a modal
+on layer 1.
 
 **Schema changes require a migration.** Real users' `chrome.storage.local`
 persists across every version of this extension they've had installed -
@@ -205,7 +240,7 @@ collision:
 - **`session.guid`** - one per session, generated with `crypto.randomUUID()`
   (falling back to `crypto.getRandomValues()` on plain `http://` pages,
   where `randomUUID()` isn't available). Written into the report as a hidden
-  `<meta name="alan-review-session-id">` - parsable, never rendered.
+  `<meta name="tagger-session-id">` - parsable, never rendered.
 - **`CM-<n>`** - one per comment, unique _within_ a session. Combine the two
   for a globally unique id.
 
@@ -234,7 +269,7 @@ instructions.
    font files inlined as data. The version shown in the panel comes from
    `package.json` via a Vite `define`. A missing source file fails the
    build.
-2. Copies `content.js`, `background.js` and `alan-logo.png` into
+2. Copies `content.js` and `background.js` into
    `dist/chrome` and `dist/firefox`, with each browser's own manifest as
    `manifest.json`.
 

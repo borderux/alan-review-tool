@@ -14,6 +14,21 @@ export function formatDateTime(timestamp: number): string {
   return dateTimeFormat.format(new Date(timestamp));
 }
 
+// For the downloaded report, which is read later and possibly in another
+// time zone: the same format, with the zone stated.
+const dateTimeWithZoneFormat = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  timeZoneName: "short",
+});
+
+export function formatDateTimeWithZone(timestamp: number): string {
+  return dateTimeWithZoneFormat.format(new Date(timestamp));
+}
+
 const timeFormat = new Intl.DateTimeFormat(undefined, {
   hour: "numeric",
   minute: "2-digit",

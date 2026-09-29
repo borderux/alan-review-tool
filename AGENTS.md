@@ -42,8 +42,10 @@ assume none of that is obvious from a local diff alone.
   version-gated database, no clean slate, and old-shape data reaching new
   code has already caused a real crash-on-load bug once. Migrate in
   `migrateSession()` (`src/content/lib/storage.ts`), which runs right after
-  the session is loaded, before anything else touches it. UI-only state
-  (the undo buffers, for example) stays in memory and out of storage
+  the session is loaded, before anything else touches it. Renamed storage
+  keys go through `migrateStorageKeys()` in the same file (copy old to new
+  unless new exists, then delete old). UI-only state stays in memory and
+  out of storage
 - A real toolbar click can't be scripted, so verify browser-facing changes
   with Playwright instead of assuming a diff is correct: stub
   `chrome.storage.local`/`chrome.runtime` in an init script, load the

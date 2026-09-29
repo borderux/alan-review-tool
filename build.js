@@ -9,7 +9,7 @@ const DIST = path.join(ROOT, "dist");
 const CONTENT_OUT = path.join(DIST, ".content", "content.js");
 
 // Copied as-is. content.js is not in this list - it is Vite's output.
-const SHARED_FILES = ["background.js", "alan-logo.png"];
+const SHARED_FILES = ["background.js"];
 const TARGETS = {
   chrome: "manifest.chrome.json",
   firefox: "manifest.firefox.json",

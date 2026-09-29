@@ -1,5 +1,5 @@
 ---
-"alan-review-tool": minor
+"tagger": minor
 ---
 
-Rebuild the review panel on the Recursica design system (React, TypeScript, Vite), with light and dark mode following the operating system, tabs for comments, session and help, undo for deleted comments and screenshots, explicit save and cancel for screenshot annotations, and a persistent save status.
+Rename the extension to Tagger and rebuild its review panel on the Recursica design system (React, TypeScript, Vite): light and dark mode following the operating system; tabs for Comments, Reviewer and Help; a New comment field where Enter adds a numbered comment; screenshot comments with Add annotations and a choice of six pen colors; a menu per comment for Duplicate and Delete; confirmation before any delete or Start over; and a failed save reported as a message. Stored data moves to new storage keys automatically.

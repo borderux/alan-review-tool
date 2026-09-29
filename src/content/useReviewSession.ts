@@ -4,24 +4,9 @@ import { saveReviewer, saveSession } from "./lib/storage";
 import type { ReviewComment, Session } from "./lib/types";
 
 // Structural changes (a new, deleted or duplicated comment, a capture, a
-// clear) save immediately. Plain typing saves after a pause instead, so
-// chrome.storage.local isn't written on every keystroke. Same timing as
-// the pre-React panel.
+// start over) save immediately. Plain typing saves after a pause instead,
+// so chrome.storage.local isn't written on every keystroke.
 const TYPING_SAVE_DELAY_MS = 400;
-
-export type SaveStatus = "no-session" | "saving" | "saved" | "failed";
-
-// A comment deleted in this panel instance, kept in memory so its delete
-// control can turn into an Undo in the same place. Storage is updated at
-// once; the undo re-inserts it. Nothing here is persisted, so the stored
-// session shape is unchanged.
-export interface DeletedComment {
-  comment: ReviewComment;
-  pageKey: string;
-  // The id of the comment that followed it when it was deleted, or null
-  // if it was last. The placeholder and any undo return it to that spot.
-  beforeId: number | null;
-}
 
 function newSession(): Session {
   return {
@@ -57,7 +42,9 @@ interface Options {
   initialSession: Session | null;
   initialUserName: string;
   initialUserEmail: string;
-  // Called when a write to storage fails, with the browser's reason.
+  // Called when a write to storage fails, with the browser's reason. The
+  // panel shows no "saved" status (an approved exception); a failure is
+  // the one save outcome it reports.
   onSaveError: (reason: string) => void;
 }
 
@@ -70,20 +57,6 @@ export function useReviewSession({
   const [session, setSessionState] = useState<Session | null>(initialSession);
   const [userName, setUserNameState] = useState(initialUserName);
   const [userEmail, setUserEmailState] = useState(initialUserEmail);
-  // Session and reviewer details save on separate timers; either one
-  // pending means changes are still being saved.
-  const [sessionSaving, setSessionSaving] = useState(false);
-  const [reviewerSaving, setReviewerSaving] = useState(false);
-  const [saveFailed, setSaveFailed] = useState(false);
-  // When the last write finished, for the "saved at" status. Null until
-  // this panel has saved something.
-  const [savedAt, setSavedAt] = useState<number | null>(null);
-  const [deletedComments, setDeletedComments] = useState<DeletedComment[]>([]);
-  // Screenshots deleted from a comment in this panel instance, by comment
-  // id, so the slot can offer Undo.
-  const [deletedScreenshots, setDeletedScreenshots] = useState<
-    Record<number, string>
-  >({});
 
   // Handlers need the latest session synchronously (for example, to hand
   // a new comment's id to focus), so it is mirrored in a ref that only
@@ -101,22 +74,14 @@ export function useReviewSession({
     onSaveErrorRef.current = onSaveError;
   }, [onSaveError]);
 
-  // Every write goes through here, so success and failure are reported
-  // the same way whichever key was written.
+  // Every write goes through here, so a failure is reported the same way
+  // whichever key was written. Screenshots live in the session, and
+  // without the unlimitedStorage permission the quota is reachable.
   const track = useCallback((write: Promise<void>) => {
-    write.then(
-      () => {
-        setSaveFailed(false);
-        setSavedAt(Date.now());
-      },
-      (err: unknown) => {
-        console.error("Alan Review Tool: could not save.", err);
-        setSaveFailed(true);
-        onSaveErrorRef.current(
-          String(err instanceof Error ? err.message : err),
-        );
-      },
-    );
+    write.catch((err: unknown) => {
+      console.error("Tagger: could not save.", err);
+      onSaveErrorRef.current(String(err instanceof Error ? err.message : err));
+    });
   }, []);
 
   const commit = useCallback(
@@ -127,14 +92,11 @@ export function useReviewSession({
       if (mode === "now") {
         saveTimer.current = null;
         track(saveSession(next));
-        setSessionSaving(false);
         return;
       }
-      setSessionSaving(true);
       saveTimer.current = setTimeout(() => {
         saveTimer.current = null;
         track(saveSession(latest.current));
-        setSessionSaving(false);
       }, TYPING_SAVE_DELAY_MS);
     },
     [track],
@@ -157,19 +119,13 @@ export function useReviewSession({
 
   useEffect(() => flush, [flush]);
 
-  const nextNumber = (s: Session): [Session, number] => {
-    const n = s.commentCounter + 1;
-    return [{ ...s, commentCounter: n }, n];
-  };
-
   // Creates a comment at the top of the page's list (newest first) and
   // returns its id. The CM-<n> counter only ever goes up, even across
   // deletes: CM-<n> plus the session guid is a permanent id.
   const addComment = useCallback(
     (pageKey: string, text = "", screenshot: string | null = null) => {
-      const [numbered, commentNumber] = nextNumber(
-        latest.current ?? newSession(),
-      );
+      const base = latest.current ?? newSession();
+      const commentNumber = base.commentCounter + 1;
       const comment: ReviewComment = {
         id: Date.now(),
         commentNumber,
@@ -177,7 +133,11 @@ export function useReviewSession({
         screenshot,
       };
       commit(
-        withPageComments(numbered, pageKey, (list) => [comment, ...list]),
+        withPageComments(
+          { ...base, commentCounter: commentNumber },
+          pageKey,
+          (list) => [comment, ...list],
+        ),
         "now",
       );
       return comment.id;
@@ -210,23 +170,10 @@ export function useReviewSession({
     [commit],
   );
 
-  // Removes a comment. `withUndo: false` is for the silent cleanup of a
-  // comment that was started and left empty - there is nothing to undo.
   const deleteComment = useCallback(
-    (pageKey: string, id: number, withUndo: boolean) => {
+    (pageKey: string, id: number) => {
       const current = latest.current;
-      const list = current?.pages[pageKey]?.comments;
-      if (!current || !list) return;
-      const index = list.findIndex((c) => c.id === id);
-      if (index === -1) return;
-      if (withUndo) {
-        const deleted: DeletedComment = {
-          comment: list[index],
-          pageKey,
-          beforeId: list[index + 1]?.id ?? null,
-        };
-        setDeletedComments((all) => [...all, deleted]);
-      }
+      if (!current?.pages[pageKey]) return;
       commit(
         withPageComments(current, pageKey, (comments) =>
           comments.filter((c) => c.id !== id),
@@ -237,56 +184,8 @@ export function useReviewSession({
     [commit],
   );
 
-  const undoDeleteComment = useCallback(
-    (id: number) => {
-      const entry = deletedComments.find((d) => d.comment.id === id);
-      setDeletedComments((all) => all.filter((d) => d.comment.id !== id));
-      if (!entry) return;
-      commit(
-        withPageComments(
-          latest.current ?? newSession(),
-          entry.pageKey,
-          (comments) => {
-            const at =
-              entry.beforeId == null
-                ? comments.length
-                : comments.findIndex((c) => c.id === entry.beforeId);
-            const next = [...comments];
-            next.splice(at === -1 ? 0 : at, 0, entry.comment);
-            return next;
-          },
-        ),
-        "now",
-      );
-    },
-    [commit, deletedComments],
-  );
-
-  const deleteScreenshot = useCallback(
-    (pageKey: string, comment: ReviewComment) => {
-      if (!comment.screenshot) return;
-      const shot = comment.screenshot;
-      setDeletedScreenshots((all) => ({ ...all, [comment.id]: shot }));
-      updateComment(pageKey, comment.id, { screenshot: null }, "now");
-    },
-    [updateComment],
-  );
-
-  const undoDeleteScreenshot = useCallback(
-    (pageKey: string, commentId: number) => {
-      const shot = deletedScreenshots[commentId];
-      setDeletedScreenshots((all) => {
-        const rest = { ...all };
-        delete rest[commentId];
-        return rest;
-      });
-      if (shot) updateComment(pageKey, commentId, { screenshot: shot }, "now");
-    },
-    [updateComment, deletedScreenshots],
-  );
-
   // The first keystroke into session details with no session yet starts
-  // one, exactly as before.
+  // one.
   const setDetails = useCallback(
     (details: string) => {
       commit({ ...(latest.current ?? newSession()), details }, "typing");
@@ -294,21 +193,15 @@ export function useReviewSession({
     [commit],
   );
 
-  const clearSession = useCallback(() => {
-    setDeletedComments([]);
-    setDeletedScreenshots({});
-    commit(null, "now");
-  }, [commit]);
+  const startOver = useCallback(() => commit(null, "now"), [commit]);
 
   const scheduleReviewerSave = useCallback(() => {
     if (reviewerTimer.current) clearTimeout(reviewerTimer.current);
-    setReviewerSaving(true);
     reviewerTimer.current = setTimeout(() => {
       reviewerTimer.current = null;
       track(
         saveReviewer(reviewer.current.userName, reviewer.current.userEmail),
       );
-      setReviewerSaving(false);
     }, TYPING_SAVE_DELAY_MS);
   }, [track]);
 
@@ -330,32 +223,16 @@ export function useReviewSession({
     [scheduleReviewerSave],
   );
 
-  const saveStatus: SaveStatus =
-    sessionSaving || reviewerSaving
-      ? "saving"
-      : saveFailed
-        ? "failed"
-        : !session
-          ? "no-session"
-          : "saved";
-
   return {
     session,
     userName,
     userEmail,
-    saveStatus,
-    savedAt,
-    deletedComments,
-    deletedScreenshots,
     addComment,
     duplicateComment,
     updateComment,
     deleteComment,
-    undoDeleteComment,
-    deleteScreenshot,
-    undoDeleteScreenshot,
     setDetails,
-    clearSession,
+    startOver,
     setUserName,
     setUserEmail,
     flush,

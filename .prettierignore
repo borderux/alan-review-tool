@@ -1,1 +1,4 @@
 dist
+# Agent configuration is not part of this project and must not be
+# reformatted by `npm run format`.
+.claude/

@@ -1,67 +1,58 @@
-import type { MutableRefObject, RefObject } from "react";
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  MutableRefObject,
+  RefObject,
+} from "react";
 import { Camera } from "@phosphor-icons/react";
-import { Button, Group, Stack, Text } from "@recursica/adapter-mantine-v8";
+import {
+  Button,
+  Group,
+  Stack,
+  Text,
+  TextField,
+} from "@recursica/adapter-mantine-v8";
+import { plural } from "../lib/format";
 import type { ReviewComment } from "../lib/types";
-import type { FormLayout } from "../ReviewPanel";
-import type { DeletedComment, ReviewSession } from "../useReviewSession";
-import { CommentItem, DeletedCommentItem } from "./CommentItem";
+import { fieldLayout, type FormLayout } from "../ReviewPanel";
+import type { ReviewSession } from "../useReviewSession";
+import { CommentItem } from "./CommentItem";
 
 interface CommentsTabProps {
   review: ReviewSession;
   pageKey: string;
   comments: ReviewComment[];
   formLayout: FormLayout;
-  addCommentRef: RefObject<HTMLButtonElement | null>;
+  newCommentRef: RefObject<HTMLInputElement | null>;
+  draft: string;
+  onDraftChange: (draft: string) => void;
+  // Across the whole session, for the scope note above the list.
+  totalCount: number;
+  pageCount: number;
   focusId: number | null;
   onFocused: () => void;
   capturing: MutableRefObject<boolean>;
   // What is being captured right now, so its button shows it is busy.
   captureTarget: "new" | number | null;
-  onAddComment: () => void;
+  onAddComment: (text: string) => void;
   onAddScreenshot: () => void;
   onAddScreenshotTo: (comment: ReviewComment) => void;
   onDuplicate: (comment: ReviewComment) => void;
-  onEditScreenshot: (comment: ReviewComment) => void;
-}
-
-type ListItem =
-  | { kind: "comment"; comment: ReviewComment }
-  | { kind: "deleted"; deleted: DeletedComment };
-
-// Deleted comments keep their place in the list, as an Undo, until the
-// panel closes. Each goes back in front of the comment that followed it.
-function withDeletedPlaceholders(
-  comments: ReviewComment[],
-  deleted: DeletedComment[],
-): ListItem[] {
-  const items: ListItem[] = comments.map((comment) => ({
-    kind: "comment",
-    comment,
-  }));
-  for (const entry of deleted) {
-    const at =
-      entry.beforeId == null
-        ? -1
-        : items.findIndex(
-            (item) =>
-              (item.kind === "comment"
-                ? item.comment.id
-                : item.deleted.comment.id) === entry.beforeId,
-          );
-    const placeholder: ListItem = { kind: "deleted", deleted: entry };
-    if (at === -1) items.push(placeholder);
-    else items.splice(at, 0, placeholder);
-  }
-  return items;
+  onRequestDelete: (comment: ReviewComment) => void;
+  onAnnotate: (comment: ReviewComment) => void;
 }
 
 // The Comments tab: what the reviewer came for, and the tab that opens.
+// The add controls stay pinned under the tab bar; the list scrolls.
 export function CommentsTab({
   review,
   pageKey,
   comments,
   formLayout,
-  addCommentRef,
+  newCommentRef,
+  draft,
+  onDraftChange,
+  totalCount,
+  pageCount,
   focusId,
   onFocused,
   capturing,
@@ -70,80 +61,106 @@ export function CommentsTab({
   onAddScreenshot,
   onAddScreenshotTo,
   onDuplicate,
-  onEditScreenshot,
+  onRequestDelete,
+  onAnnotate,
 }: CommentsTabProps) {
-  const items = withDeletedPlaceholders(
-    comments,
-    review.deletedComments.filter((d) => d.pageKey === pageKey),
-  );
+  // The fast typing flow: type, press Enter, and the comment is added with
+  // focus still in the field for the next one. A single-line field, so
+  // Enter adding is the field's normal behaviour; longer comments are
+  // edited in their own row, which grows with the text.
+  const addDraft = () => {
+    const text = draft.trim();
+    if (!text) {
+      newCommentRef.current?.focus();
+      return;
+    }
+    onAddComment(text);
+    onDraftChange("");
+    newCommentRef.current?.focus();
+  };
+
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    addDraft();
+  };
 
   return (
-    <Stack gap="rec-default" mt="rec-default">
-      <Group gap="rec-sm">
-        <Button variant="outline" ref={addCommentRef} onClick={onAddComment}>
-          Add comment
-        </Button>
-        <Button
-          variant="outline"
-          icon={<Camera />}
-          loading={captureTarget === "new"}
-          onClick={() => onAddScreenshot()}
-        >
-          Add screenshot
-        </Button>
-      </Group>
+    <Stack gap="rec-default">
+      <div className="art-pinned art-pinned-below-tabs">
+        <Stack gap="rec-sm" pt="rec-default">
+          <TextField
+            ref={newCommentRef}
+            data-new-comment="true"
+            label="New comment"
+            {...fieldLayout(formLayout)}
+            placeholder="Describe the issue or change"
+            assistiveText="Enter adds it to the list"
+            value={draft}
+            onChange={(event) => onDraftChange(event.currentTarget.value)}
+            onKeyDown={onKeyDown}
+          />
+          <Group gap="rec-sm">
+            {/* Disabled until there is text; the field above says what it
+                needs. */}
+            <Button
+              variant="outline"
+              disabled={!draft.trim()}
+              onClick={addDraft}
+            >
+              Add comment
+            </Button>
+            <Button
+              variant="outline"
+              icon={<Camera />}
+              loading={captureTarget === "new"}
+              onClick={() => onAddScreenshot()}
+            >
+              Add screenshot
+            </Button>
+          </Group>
+        </Stack>
+      </div>
 
-      {items.length === 0 ? (
-        <Text>No comments on this page yet</Text>
+      {/* The list shows this page only; say so, and what the report
+          covers, so the narrowing is never silent. */}
+      {totalCount > 0 && (
+        <Text variant="caption" emphasis="low">
+          {`This page: ${plural(comments.length, "comment", "comments")} · Report: ${plural(totalCount, "comment", "comments")} across ${plural(pageCount, "page", "pages")}`}
+        </Text>
+      )}
+      {comments.length === 0 ? (
+        <Text>
+          {totalCount === 0
+            ? "No comments yet. Download report needs at least one."
+            : "No comments on this page yet"}
+        </Text>
       ) : (
         <Stack
           component="ol"
           className="art-list"
           aria-label="Comments on this page"
-          gap="rec-md"
+          gap="rec-lg"
         >
-          {items.map((item) =>
-            item.kind === "comment" ? (
-              <CommentItem
-                key={item.comment.id}
-                comment={item.comment}
-                formLayout={formLayout}
-                capturingScreenshot={captureTarget === item.comment.id}
-                deletedScreenshot={
-                  review.deletedScreenshots[item.comment.id] != null
-                }
-                autoFocus={focusId === item.comment.id}
-                onFocused={onFocused}
-                capturing={capturing}
-                onTextChange={(text) =>
-                  review.updateComment(
-                    pageKey,
-                    item.comment.id,
-                    { text },
-                    "typing",
-                  )
-                }
-                onLeftEmpty={() =>
-                  review.deleteComment(pageKey, item.comment.id, false)
-                }
-                onDelete={() =>
-                  review.deleteComment(pageKey, item.comment.id, true)
-                }
-                onDuplicate={() => onDuplicate(item.comment)}
-                onAddScreenshot={() => onAddScreenshotTo(item.comment)}
-                onEditScreenshot={() => onEditScreenshot(item.comment)}
-                onUndoScreenshot={() =>
-                  review.undoDeleteScreenshot(pageKey, item.comment.id)
-                }
-              />
-            ) : (
-              <DeletedCommentItem
-                key={`deleted-${item.deleted.comment.id}`}
-                comment={item.deleted.comment}
-                onUndo={() => review.undoDeleteComment(item.deleted.comment.id)}
-              />
-            ),
-          )}
+          {comments.map((comment) => (
+            <CommentItem
+              key={comment.id}
+              comment={comment}
+              formLayout={formLayout}
+              capturingScreenshot={captureTarget === comment.id}
+              autoFocus={focusId === comment.id}
+              onFocused={onFocused}
+              capturing={capturing}
+              onTextChange={(text) =>
+                review.updateComment(pageKey, comment.id, { text }, "typing")
+              }
+              onLeftEmpty={() => review.deleteComment(pageKey, comment.id)}
+              onDelete={() => onRequestDelete(comment)}
+              onDuplicate={() => onDuplicate(comment)}
+              onAddScreenshot={() => onAddScreenshotTo(comment)}
+              onAnnotate={() => onAnnotate(comment)}
+            />
+          ))}
         </Stack>
       )}
     </Stack>

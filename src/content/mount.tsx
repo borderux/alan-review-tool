@@ -46,6 +46,13 @@ export async function mountPanel(): Promise<void> {
   // it inside the layer-0 scope.
   const portalEl = document.createElement("div");
   portalEl.className = "art-portal";
+  // Modals render here instead: the same pinned container, declaring
+  // layer 1. It is a plain element carrying the layer attribute rather than
+  // the adapter's Layer component, because Layer paints its own padded
+  // surface, which would show as a box at the top-left corner of the page.
+  const modalPortalEl = document.createElement("div");
+  modalPortalEl.className = "art-portal";
+  modalPortalEl.setAttribute("data-recursica-layer", "1");
 
   const reactRoot = createRoot(rootEl);
   const teardown = () => {
@@ -58,6 +65,7 @@ export async function mountPanel(): Promise<void> {
       host={host}
       rootEl={rootEl}
       portalEl={portalEl}
+      modalPortalEl={modalPortalEl}
       stored={stored}
       onClosed={teardown}
     />,

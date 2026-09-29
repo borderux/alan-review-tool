@@ -1,4 +1,4 @@
-# Alan Review Tool
+# Tagger
 
 A Manifest V3 browser extension (Chrome and Firefox) for capturing UI/UX
 feedback on any website. Click the toolbar icon on any tab and a slide-out
@@ -12,10 +12,13 @@ JavaScript in what you export.
   domain or embedded snippet.
 - **Comments and screenshots**, grouped into a single review **session**
   that spans every page visited, not scoped to one tab or one origin.
+- **Fast comments** — type in New comment and press Enter; each comment
+  lands in a numbered list and focus stays in the field for the next one.
 - **Screenshot capture with freehand annotation** — drag-select any region
-  of the page, then draw directly on the captured image (cyan, 3px) to
-  point at the specific thing you mean. Annotations bake permanently into
-  the image once you dismiss the lightbox.
+  of the page, then use Add annotations to draw on it in one of six
+  colors (red by default; the last choice is remembered). Every stroke
+  has a thin contrasting outline so it shows on light and dark
+  screenshots. Save annotations bakes the drawing into the image.
 - **Built on the Recursica design system** (React, TypeScript and the
   Recursica Mantine adapter, with the default Recursica Forge theme), in
   light or dark mode following your operating system.
@@ -36,6 +39,11 @@ JavaScript in what you export.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for how all of this fits together,
 and [llms.txt](llms.txt) for a quick map of the repo's layout.
+
+## Supported screens
+
+Desktop browsers only. The panel is designed for a desktop window and has
+no separate small-screen or touch layout.
 
 ## Build
 

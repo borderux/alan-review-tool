@@ -4,7 +4,9 @@
 // panel's shadow root, so no Recursica component or token reaches it - it
 // is the one deliberately hand-built surface, approved as such.
 
-export const OVERLAY_ID = "alan-review-tool-selection-overlay";
+import { suspendPagePush } from "./page";
+
+export const OVERLAY_ID = "tagger-selection-overlay";
 
 function setPanelHidden(host: HTMLElement, hidden: boolean): void {
   host.style.visibility = hidden ? "hidden" : "visible";
@@ -20,14 +22,8 @@ export interface Rect {
 // Lets the user drag a rectangle directly on the page (not the panel) and
 // resolves with its viewport coordinates, or null if they cancel (Escape,
 // leaving the window, or too small a drag to count as intentional).
-export function selectRegion(host: HTMLElement): Promise<Rect | null> {
+export function selectRegion(): Promise<Rect | null> {
   return new Promise((resolve) => {
-    // Hidden, not removed - the page stays at its pushed width, so the
-    // panel's own region is just blank canvas during selection. It stays
-    // hidden until the capture itself is done (see captureRegion), so it
-    // can never appear in its own screenshot.
-    setPanelHidden(host, true);
-
     const overlay = document.createElement("div");
     overlay.id = OVERLAY_ID;
     overlay.style.all = "initial";
@@ -153,7 +149,7 @@ async function sendCaptureRequest(
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       return (await chrome.runtime.sendMessage({
-        type: "alan-review-tool:capture",
+        type: "tagger:capture",
       })) as CaptureResponse | undefined;
     } catch (err) {
       if (attempt === attempts) throw err;
@@ -175,7 +171,7 @@ export async function captureAndCrop(rect: Rect): Promise<CaptureResult> {
   const response = await sendCaptureRequest();
   if (!response?.dataUrl) {
     return {
-      error: response?.error || "the background worker returned nothing",
+      error: response?.error || "the browser did not return an image",
     };
   }
 
@@ -202,19 +198,40 @@ export async function captureAndCrop(rect: Rect): Promise<CaptureResult> {
   return { dataUrl: canvas.toDataURL("image/jpeg", 0.85) };
 }
 
+// Runs a capture with the panel hidden and the page at its full width,
+// and always puts both back afterwards - on success, cancel or failure.
+// Hidden, not removed, so nothing about the panel's state is lost, and it
+// stays hidden until the pixels are taken, so it can never appear in its
+// own screenshot.
+export async function withPanelAway<T>(
+  host: HTMLElement,
+  run: () => Promise<T>,
+): Promise<T> {
+  setPanelHidden(host, true);
+  const resumePush = suspendPagePush();
+  try {
+    return await run();
+  } finally {
+    resumePush();
+    setPanelHidden(host, false);
+  }
+}
+
 // Selects a region and captures it in one step. Resolves null when the
-// user cancels; never throws - a failure comes back as { error }.
+// user cancels; never throws - a failure comes back as { error }. The
+// selection rectangle is in the full-width page's viewport coordinates,
+// which is exactly what captureVisibleTab then captures.
 export async function captureRegion(
   host: HTMLElement,
 ): Promise<CaptureResult | null> {
   try {
-    const rect = await selectRegion(host);
-    if (!rect) return null;
-    return await captureAndCrop(rect);
+    return await withPanelAway(host, async () => {
+      const rect = await selectRegion();
+      if (!rect) return null;
+      return captureAndCrop(rect);
+    });
   } catch (err) {
-    console.error("Alan Review Tool: screenshot capture failed.", err);
+    console.error("Tagger: screenshot capture failed.", err);
     return { error: String(err) };
-  } finally {
-    setPanelHidden(host, false);
   }
 }
