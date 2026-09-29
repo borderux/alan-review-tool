@@ -74,11 +74,29 @@ Anything that must survive a close/reopen lives outside the script:
 `data-*` attributes on `document.documentElement` for the page's own
 pre-panel inline styles and the fonts-registered flag.
 
+Element picking (`lib/element.ts`) is a second hand-built overlay in the
+host page, under the same conditions: the mouse highlights the element
+under it and a click chooses; arrow up and down move to the parent and
+first child, Enter chooses, Escape cancels. The page's own handlers never
+see those clicks and keys. Open shadow roots are followed; closed ones stop
+at their host. Frames are never entered - a transparent blocker covers each
+one while picking, and choosing one says its content can't be captured.
+
 While a screenshot region is being selected, the panel is hidden and the
 page gets its full width back (`withPanelAway()` in `lib/capture.ts`), so
 there is no blank strip and the capture covers the page as it really lays
 out; the panel and the push come back afterwards on every path - success,
 cancel or failure.
+
+While any modal is open, the host page's `<body>` and the panel content
+are made `inert` (prior values restored), so only the modal is reachable.
+Escape that starts inside a modal or a menu is never treated as closing the
+panel: Mantine closes its modal in a capture listener on `window`, before
+React's handler runs, so the panel checks where the key came from rather
+than trusting its own modal state. When the panel closes, whatever had
+focus on the page before it opened gets focus back. Pending typing is
+written on `pagehide` and when the page is hidden, so a refresh never loses
+it.
 
 The panel **pushes** the page rather than overlaying it: opening the panel
 shrinks `document.documentElement`'s width (with a transition) instead of
@@ -155,7 +173,7 @@ session = {
     "<origin+pathname+search>": {
       title: <string>,          // document.title, captured once per page
       comments: [
-        { id, commentNumber, text, screenshot },
+        { id, commentNumber, text, screenshot, element? },
         ...
       ]
     },
@@ -177,10 +195,24 @@ change it without a reload, and a content script can't see the page's own
 history calls, so `usePageKey()` re-reads it on a short interval; comments
 added after an in-app navigation are filed under the new address.
 
-There is one kind of stored comment: text plus an optional screenshot. The
-panel shows it as a quick comment (text only) or a screenshot comment
-(thumbnail, Add annotations, text), depending on whether it has a
-screenshot; the stored record is the same either way.
+There is one kind of stored comment: text plus an optional screenshot, and
+an optional `element`. The panel shows it as a quick comment (text only), a
+screenshot comment (thumbnail, Add annotations, text), or an element
+comment (the same, plus the element's selector), depending on what it has;
+the stored record is the same either way.
+
+`element` (added with element capture, `CapturedElement` in
+`lib/types.ts`) is what Add element records, like the browser's element
+inspector: a CSS selector path (crossing an open shadow root is written
+`>>>`), the element's HTML with its descendants, a compact set of 48
+computed style properties, and the viewport size; its `screenshot` is the
+element cropped from the page. Everything in it is copied from someone
+else's page, so it is untrusted: it is escaped wherever it is shown. Before
+it is stored, form values, textarea text, select choices, editable content,
+password values, script contents and inline event handlers are removed. The
+HTML is capped at 50,000 characters and the styles at 8,000; anything cut
+is flagged, and the panel and the report say so. The field is optional, so
+older sessions load unchanged; `migrateSession()` drops a malformed one.
 
 **The storage keys were renamed** with the product, from `alanReviewTool*`
 to `tagger*`. `migrateStorageKeys()` runs before anything reads storage:
@@ -228,6 +260,9 @@ rendered with React:
   once at creation, across all three ways a comment is created (new
   comment, new screenshot, duplicate), and never reused even after a
   delete.
+- **Element comments** also show the captured element: its selector and
+  viewport, then its HTML and styles in collapsible `<details>` sections
+  (no JavaScript needed), all escaped.
 - **Screenshots** as 50x50 thumbnails, paired with a full-resolution image
   in a **pure-CSS lightbox** (an anchor + `:target`, no click handlers, no
   JavaScript at all).
@@ -254,7 +289,8 @@ The report also carries a hidden `<meta name="ai-report-instructions">` tag,
 inlined from `src/ai-report-instructions.txt` at build time, explaining the
 report's structure to a coding agent reading it later, and drawing an
 explicit trust boundary: comment text is reviewer-authored, untrusted
-content describing a requested UI change, never a set of operating
+content describing a requested UI change, and captured HTML, styles and
+selectors are untrusted page content; none of it is ever a set of operating
 instructions.
 
 ## Build

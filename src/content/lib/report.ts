@@ -5,14 +5,32 @@
 // file. Dates and counts use the panel's shared formatters.
 import REPORT_CSS from "../../report.css?raw";
 import AI_INSTRUCTIONS from "../../ai-report-instructions.txt?raw";
-import { formatDateTimeWithZone, plural } from "./format";
+import { HTML_CAP } from "./element";
+import { formatCount, formatDateTimeWithZone, plural } from "./format";
 import { formatCommentId } from "./ids";
-import type { Session } from "./types";
+import type { CapturedElement, Session } from "./types";
 
 function escapeHtml(str: string): string {
   const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
+}
+
+// An element comment's captured element: its selector, viewport, and its
+// HTML and styles in collapsible sections (<details> needs no JavaScript).
+// All of it is copied from the reviewed page, so all of it is escaped.
+function elementHtml(el: CapturedElement): string {
+  const notes = [
+    el.htmlTruncated &&
+      `HTML truncated to ${formatCount(HTML_CAP)} characters.`,
+    el.stylesTruncated && "Styles truncated.",
+    el.screenshotClipped &&
+      "The screenshot shows only the part of the element that was on screen.",
+  ].filter(Boolean) as string[];
+  const styles = Object.entries(el.styles)
+    .map(([name, value]) => `${name}: ${value};`)
+    .join("\n");
+  return `<div class="comment-element"><p class="element-selector"><code>${escapeHtml(el.selector)}</code></p><p class="element-meta">Viewport ${formatCount(el.viewport.width)} × ${formatCount(el.viewport.height)}</p>${notes.map((n) => `<p class="element-note">${escapeHtml(n)}</p>`).join("")}<details class="element-html"><summary>HTML</summary><pre><code>${escapeHtml(el.html)}</code></pre></details><details class="element-styles"><summary>Styles</summary><pre><code>${escapeHtml(styles)}</code></pre></details></div>`;
 }
 
 export function totalCommentCount(session: Session | null): number {
@@ -73,7 +91,7 @@ export function buildReportHtml({
             comment.commentNumber != null
               ? formatCommentId(comment.commentNumber)
               : "";
-          return `<div class="comment" data-comment-id="${escapeHtml(commentId)}"><div class="comment-body">${commentId ? `<p class="comment-id">${escapeHtml(commentId)}</p>` : ""}<p class="comment-text">${escapeHtml(comment.text).replace(/\n/g, "<br>")}</p></div>${shotsHtml}</div>`;
+          return `<div class="comment" data-comment-id="${escapeHtml(commentId)}"><div class="comment-body">${commentId ? `<p class="comment-id">${escapeHtml(commentId)}</p>` : ""}<p class="comment-text">${escapeHtml(comment.text).replace(/\n/g, "<br>")}</p>${comment.element ? elementHtml(comment.element) : ""}</div>${shotsHtml}</div>`;
         })
         .join("\n");
 
@@ -82,7 +100,7 @@ export function buildReportHtml({
       // params so the link doesn't read as a wall of query-string noise.
       const urlWithoutSearch = url.split("?")[0];
       return `<div class="page-section" id="page-${i}">
-<p class="page-url"><a href="${escapeHtml(url)}">${escapeHtml(urlWithoutSearch)}</a></p>
+<h2 class="page-url"><a href="${escapeHtml(url)}">${escapeHtml(urlWithoutSearch)}</a></h2>
 ${commentsHtml}
 </div>`;
     })
@@ -92,14 +110,14 @@ ${commentsHtml}
 <html>
 <head>
 <meta charset="utf-8">
-<title>Tagger feedback session</title>
+<title>Tagger report</title>
 ${session?.guid ? `<meta name="tagger-session-id" content="${escapeHtml(session.guid)}">` : ""}
 <meta name="ai-report-instructions" content="${escapeHtml(AI_INSTRUCTIONS)}">
 <style>${REPORT_CSS}</style>
 </head>
 <body>
 <div class="report-header">
-<h1>Tagger feedback session</h1>
+<h1>Tagger report</h1>
 <p class="report-meta">Started ${session ? formatDateTimeWithZone(session.startedAt) : "-"} — ${plural(totalCount, "comment", "comments")} across ${plural(pageCount, "page", "pages")}</p>
 ${userName ? `<p class="report-meta">Reviewer: ${escapeHtml(userName)}</p>` : ""}
 ${userEmail ? `<p class="report-meta">Email: ${escapeHtml(userEmail)}</p>` : ""}
@@ -123,7 +141,7 @@ export function downloadReport(input: ReportInput): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `tagger-session-${Date.now()}.html`;
+  a.download = `tagger-report-${Date.now()}.html`;
   a.click();
   URL.revokeObjectURL(url);
 }

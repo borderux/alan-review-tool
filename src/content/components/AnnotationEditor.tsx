@@ -160,7 +160,7 @@ export function AnnotationEditor({
         <Stack gap="rec-sm">
           {/* The reason Save annotations and Clear annotations start
               disabled, in text. */}
-          <Text variant="body-small">Drag on the screenshot to draw</Text>
+          <Text>Drag on the screenshot to draw</Text>
           <div className="art-shot">
             <img
               ref={imgRef}
@@ -190,6 +190,9 @@ export function AnnotationEditor({
             <Radio
               key={color}
               value={color}
+              // Initial focus: the first field in the editor, on the
+              // current choice.
+              {...(color === penColor ? { "data-autofocus": true } : {})}
               label={
                 <>
                   <span
@@ -218,7 +221,7 @@ export function AnnotationEditor({
           Clear annotations
         </Button>
         <Group flex={1} aria-hidden />
-        <Button variant="outline" data-autofocus onClick={onCancel}>
+        <Button variant="outline" onClick={onCancel}>
           Cancel
         </Button>
         <Button variant="solid" disabled={!hasDrawing} onClick={save}>

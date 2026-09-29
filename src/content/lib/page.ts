@@ -66,6 +66,21 @@ export function restorePage(): void {
   delete html.dataset.taggerPrevTransition;
 }
 
+// Makes the host page and the panel inert while a modal is open, and
+// returns the function that undoes it. The panel's host sits outside
+// <body>, so the body can be made inert on its own; inside the shadow
+// root, the panel content is made inert too, leaving only the modal
+// portal live. Prior values are restored, never assumed.
+export function makeBehindModalInert(host: HTMLElement): () => void {
+  const targets = [
+    document.body,
+    host.shadowRoot?.querySelector<HTMLElement>(".mantine-Drawer-content"),
+  ].filter((el): el is HTMLElement => Boolean(el));
+  const previous = targets.map((el) => el.inert);
+  for (const el of targets) el.inert = true;
+  return () => targets.forEach((el, i) => (el.inert = previous[i]));
+}
+
 // Finds an element inside the panel's shadow root.
 export function findInPanel(
   host: HTMLElement,

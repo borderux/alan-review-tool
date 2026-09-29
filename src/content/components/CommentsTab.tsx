@@ -27,14 +27,14 @@ interface CommentsTabProps {
   onDraftChange: (draft: string) => void;
   // Across the whole session, for the scope note above the list.
   totalCount: number;
-  pageCount: number;
   focusId: number | null;
   onFocused: () => void;
   capturing: MutableRefObject<boolean>;
   // What is being captured right now, so its button shows it is busy.
-  captureTarget: "new" | number | null;
+  captureTarget: "new" | "element" | number | null;
   onAddComment: (text: string) => void;
   onAddScreenshot: () => void;
+  onAddElement: () => void;
   onAddScreenshotTo: (comment: ReviewComment) => void;
   onDuplicate: (comment: ReviewComment) => void;
   onRequestDelete: (comment: ReviewComment) => void;
@@ -52,13 +52,13 @@ export function CommentsTab({
   draft,
   onDraftChange,
   totalCount,
-  pageCount,
   focusId,
   onFocused,
   capturing,
   captureTarget,
   onAddComment,
   onAddScreenshot,
+  onAddElement,
   onAddScreenshotTo,
   onDuplicate,
   onRequestDelete,
@@ -100,7 +100,26 @@ export function CommentsTab({
             onChange={(event) => onDraftChange(event.currentTarget.value)}
             onKeyDown={onKeyDown}
           />
-          <Group gap="rec-sm">
+          {/* The field's own action, Add comment, sits at the right; the
+              other ways to add sit at the left. */}
+          <Group justify="space-between" gap="rec-sm" w="100%">
+            <Group gap="rec-sm">
+              <Button
+                variant="outline"
+                icon={<Camera />}
+                loading={captureTarget === "new"}
+                onClick={() => onAddScreenshot()}
+              >
+                Add screenshot
+              </Button>
+              <Button
+                variant="outline"
+                loading={captureTarget === "element"}
+                onClick={() => onAddElement()}
+              >
+                Add element
+              </Button>
+            </Group>
             {/* Disabled until there is text; the field above says what it
                 needs. */}
             <Button
@@ -110,14 +129,6 @@ export function CommentsTab({
             >
               Add comment
             </Button>
-            <Button
-              variant="outline"
-              icon={<Camera />}
-              loading={captureTarget === "new"}
-              onClick={() => onAddScreenshot()}
-            >
-              Add screenshot
-            </Button>
           </Group>
         </Stack>
       </div>
@@ -125,9 +136,11 @@ export function CommentsTab({
       {/* The list shows this page only; say so, and what the report
           covers, so the narrowing is never silent. */}
       {totalCount > 0 && (
-        <Text variant="caption" emphasis="low">
-          {`This page: ${plural(comments.length, "comment", "comments")} · Report: ${plural(totalCount, "comment", "comments")} across ${plural(pageCount, "page", "pages")}`}
-        </Text>
+        <Stack maw={320}>
+          <Text variant="caption" emphasis="low">
+            {`Showing this page only: ${plural(comments.length, "comment", "comments")}`}
+          </Text>
+        </Stack>
       )}
       {comments.length === 0 ? (
         <Text>

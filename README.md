@@ -19,6 +19,11 @@ JavaScript in what you export.
   colors (red by default; the last choice is remembered). Every stroke
   has a thin contrasting outline so it shows on light and dark
   screenshots. Save annotations bakes the drawing into the image.
+- **Element capture** — Add element lets you pick any element on the page,
+  like the browser's element inspector (hover and click, or the arrow keys
+  and Enter). Tagger records its selector, HTML, key computed styles, the
+  viewport size and a screenshot of just that element, with typed form
+  values and script contents removed.
 - **Built on the Recursica design system** (React, TypeScript and the
   Recursica Mantine adapter, with the default Recursica Forge theme), in
   light or dark mode following your operating system.

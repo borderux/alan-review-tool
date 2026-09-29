@@ -5,20 +5,24 @@ import {
   Button,
   Group,
   Panel,
+  Stack,
   Tabs,
+  Text,
   Toast,
 } from "@recursica/adapter-mantine-v8";
+import { plural } from "./lib/format";
 import { AnnotationEditor } from "./components/AnnotationEditor";
 import { CommentsTab } from "./components/CommentsTab";
 import { ConfirmModal } from "./components/ConfirmModal";
 import { HelpTab } from "./components/HelpTab";
 import { ResizeHandle } from "./components/ResizeHandle";
 import { ReviewerTab } from "./components/ReviewerTab";
-import { captureRegion } from "./lib/capture";
+import { captureElement, captureRegion } from "./lib/capture";
 import { formatCommentId } from "./lib/ids";
 import {
   CLOSE_EVENT,
   findInPanel,
+  makeBehindModalInert,
   markPanelNonModal,
   setHostWidth,
 } from "./lib/page";
@@ -49,7 +53,7 @@ export function fieldLayout(formLayout: FormLayout) {
 
 // What is being captured right now: a new screenshot comment, or a
 // screenshot for an existing comment (by id).
-type CaptureTarget = "new" | number | null;
+type CaptureTarget = "new" | "element" | number | null;
 
 // The one confirmation that can be open, if any.
 type Confirmation =
@@ -78,7 +82,7 @@ export function ReviewPanel({
     // One message at a time: a repeat replaces the one already showing.
     onSaveError: (reason) => setToast(`Changes not saved: ${reason}`),
   });
-  const { session, flush } = review;
+  const { session, flush, track } = review;
 
   const [opened, setOpened] = useState(false);
   const [width, setWidth] = useState(stored.width);
@@ -103,6 +107,9 @@ export function ReviewPanel({
   const pageKey = usePageKey();
   const pageComments = session?.pages[pageKey]?.comments ?? [];
   const total = totalCommentCount(session);
+  const pageCount = session
+    ? Object.values(session.pages).filter((p) => p.comments.length > 0).length
+    : 0;
   const annotateComment =
     annotateId == null
       ? null
@@ -118,6 +125,15 @@ export function ReviewPanel({
   useEffect(() => {
     if (opened) markPanelNonModal(host);
   }, [host, opened]);
+
+  // While a modal is open, everything behind it is inert - the host page
+  // and the panel itself - so a screen reader's reading cursor can't wander
+  // out of the modal either. The page's own setting is put back after.
+  const modalOpen = confirmation != null || annotateId != null;
+  useEffect(() => {
+    if (!modalOpen) return;
+    return makeBehindModalInert(host);
+  }, [host, modalOpen]);
 
   // The Comments tab's add controls pin just below the tab bar, so they
   // need its height.
@@ -140,13 +156,13 @@ export function ReviewPanel({
   // Save the draft after a pause in typing, like everything else.
   useEffect(() => {
     draftRef.current = draft;
-    const timer = setTimeout(() => saveDraft(draft), 400);
+    const timer = setTimeout(() => track(saveDraft(draft)), 400);
     return () => clearTimeout(timer);
-  }, [draft]);
+  }, [draft, track]);
 
   const requestClose = useCallback(() => {
     flush();
-    saveDraft(draftRef.current);
+    void saveDraft(draftRef.current);
     setOpened(false);
     setTimeout(finishClose, CLOSE_FALLBACK_MS);
   }, [flush, finishClose]);
@@ -168,7 +184,12 @@ export function ReviewPanel({
   const onKeyDown = (event: ReactKeyboardEvent) => {
     if (event.key !== "Escape" || event.defaultPrevented) return;
     if (confirmation || annotateComment) return;
-    if ((event.target as Element).closest?.('[role="menu"]')) return;
+    // Judged by where the key came from, not only by state: Mantine closes
+    // a modal on Escape in a capture listener on window, before this runs,
+    // so by now the modal's state may already say it is closed.
+    const from = event.target as Element;
+    if (from.closest?.('[role="menu"], [role="dialog"], .mantine-Modal-root'))
+      return;
     requestClose();
   };
 
@@ -218,6 +239,19 @@ export function ReviewPanel({
       return;
     }
     setFocusId(review.addComment(pageKey, "", result.dataUrl));
+  };
+
+  const handleAddElement = async () => {
+    setToast(null);
+    setCaptureTarget("element");
+    const result = await captureElement(host);
+    setCaptureTarget(null);
+    if (!result) return;
+    if ("error" in result) {
+      setToast(`Element not captured: ${result.error}`);
+      return;
+    }
+    setFocusId(review.addComment(pageKey, "", result.dataUrl, result.element));
   };
 
   const handleAddScreenshotTo = async (comment: ReviewComment) => {
@@ -314,7 +348,12 @@ export function ReviewPanel({
       onKeyDown={onKeyDown}
       style={{ "--art-pinned-top": `${tabsBarHeight}px` } as CSSProperties}
     >
-      <ResizeHandle width={width} onChange={onWidthChange} visible={opened} />
+      <ResizeHandle
+        width={width}
+        onChange={onWidthChange}
+        visible={opened}
+        track={review.track}
+      />
       {/*
         Non-modal by design: the page behind stays usable, so the four
         modal defaults the adapter inherits from Mantine's Drawer are
@@ -331,7 +370,6 @@ export function ReviewPanel({
         {...({ size: width } as object)}
         opened={opened}
         onClose={requestClose}
-        placement="right"
         withOverlay={false}
         closeOnClickOutside={false}
         trapFocus={false}
@@ -366,19 +404,13 @@ export function ReviewPanel({
               draft={draft}
               onDraftChange={setDraft}
               totalCount={total}
-              pageCount={
-                session
-                  ? Object.values(session.pages).filter(
-                      (p) => p.comments.length > 0,
-                    ).length
-                  : 0
-              }
               focusId={focusId}
               onFocused={() => setFocusId(null)}
               capturing={capturing}
               captureTarget={captureTarget}
               onAddComment={handleAddComment}
               onAddScreenshot={handleAddScreenshot}
+              onAddElement={handleAddElement}
               onAddScreenshotTo={handleAddScreenshotTo}
               onDuplicate={handleDuplicate}
               onRequestDelete={(comment) =>
@@ -401,29 +433,43 @@ export function ReviewPanel({
           as a toast.
         */}
         <Panel.Footer>
-          <Group justify="space-between" wrap="nowrap" gap="rec-sm" w="100%">
-            <Button
-              variant="text"
-              disabled={!session}
-              data-start-over="true"
-              onClick={() => setConfirmation({ kind: "start-over" })}
-            >
-              Start over
-            </Button>
-            <Button
-              variant="solid"
-              disabled={total === 0}
-              onClick={() =>
-                downloadReport({
-                  session,
-                  userName: review.userName,
-                  userEmail: review.userEmail,
-                })
-              }
-            >
-              Download report
-            </Button>
-          </Group>
+          <Stack gap="rec-sm" w="100%">
+            {/* Always present, so it never changes the footer's height: what
+              the report and Start over act on, which is also why they are
+              disabled when there is nothing yet. */}
+            <Stack maw={320}>
+              <Text variant="caption" emphasis="low">
+                {total === 0
+                  ? session
+                    ? "Report: no comments yet"
+                    : "No session yet: add a comment to start one"
+                  : `Report and Start over: ${plural(total, "comment", "comments")} across ${plural(pageCount, "page", "pages")}`}
+              </Text>
+            </Stack>
+            <Group justify="space-between" wrap="nowrap" gap="rec-sm" w="100%">
+              <Button
+                variant="text"
+                disabled={!session}
+                data-start-over="true"
+                onClick={() => setConfirmation({ kind: "start-over" })}
+              >
+                Start over
+              </Button>
+              <Button
+                variant="solid"
+                disabled={total === 0}
+                onClick={() =>
+                  downloadReport({
+                    session,
+                    userName: review.userName,
+                    userEmail: review.userEmail,
+                  })
+                }
+              >
+                Download report
+              </Button>
+            </Group>
+          </Stack>
         </Panel.Footer>
       </Panel>
 
@@ -470,7 +516,7 @@ export function ReviewPanel({
           penColor={penColor}
           onPenColorChange={(color) => {
             setPenColor(color);
-            savePenColor(color);
+            review.track(savePenColor(color));
           }}
           onCancel={() => closeEditor(annotateComment.id)}
           onSave={(dataUrl) => {

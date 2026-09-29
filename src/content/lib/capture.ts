@@ -4,7 +4,9 @@
 // panel's shadow root, so no Recursica component or token reaches it - it
 // is the one deliberately hand-built surface, approved as such.
 
+import { pickElement, serializeElement, visibleRect } from "./element";
 import { suspendPagePush } from "./page";
+import type { CapturedElement } from "./types";
 
 export const OVERLAY_ID = "tagger-selection-overlay";
 
@@ -36,6 +38,26 @@ export function selectRegion(): Promise<Rect | null> {
     overlay.style.cursor = "crosshair";
     overlay.style.background = "rgba(0, 0, 0, 0.15)";
     document.documentElement.appendChild(overlay);
+
+    // What to do, announced: a live region inserted empty and filled a
+    // frame later, so screen readers read it.
+    const help = document.createElement("div");
+    help.style.all = "initial";
+    help.style.position = "fixed";
+    help.style.top = "12px";
+    help.style.left = "50%";
+    help.style.transform = "translateX(-50%)";
+    help.style.font = "13px/1.4 system-ui, sans-serif";
+    help.style.color = "#fff";
+    help.style.background = "#1b2a41";
+    help.style.padding = "6px 12px";
+    help.style.borderRadius = "4px";
+    help.style.pointerEvents = "none";
+    help.setAttribute("role", "status");
+    overlay.appendChild(help);
+    requestAnimationFrame(
+      () => (help.textContent = "Drag to select an area. Escape cancels."),
+    );
 
     const box = document.createElement("div");
     box.style.all = "initial";
@@ -232,6 +254,43 @@ export async function captureRegion(
     });
   } catch (err) {
     console.error("Tagger: screenshot capture failed.", err);
+    return { error: String(err) };
+  }
+}
+
+export type ElementCaptureResult =
+  { element: CapturedElement; dataUrl: string | null } | { error: string };
+
+// Picks an element and captures it: its selector, HTML, styles and
+// viewport, and a screenshot cropped to the part of it that is on screen.
+// Same conditions as a region capture - panel hidden, page at full width,
+// both restored on every path. Resolves null when the reviewer cancels.
+export async function captureElement(
+  host: HTMLElement,
+): Promise<ElementCaptureResult | null> {
+  try {
+    return await withPanelAway(host, async () => {
+      const picked = await pickElement();
+      if (!picked) return null;
+      if ("frame" in picked)
+        // Never reach into a frame: a cross-origin frame's content isn't
+        // readable, and same-origin frames are left out for consistency.
+        return {
+          error:
+            "content inside a frame can't be captured. Open the framed page on its own to capture it.",
+        };
+      const visible = visibleRect(picked.element);
+      const element = serializeElement(
+        picked.element,
+        visible?.clipped ?? false,
+      );
+      if (!visible) return { element, dataUrl: null };
+      const shot = await captureAndCrop(visible.rect);
+      if ("error" in shot) return { error: shot.error };
+      return { element, dataUrl: shot.dataUrl };
+    });
+  } catch (err) {
+    console.error("Tagger: element capture failed.", err);
     return { error: String(err) };
   }
 }

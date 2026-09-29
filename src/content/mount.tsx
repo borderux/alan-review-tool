@@ -11,6 +11,9 @@ const PANEL_ROOT_CLASS = "art-root";
 
 export async function mountPanel(): Promise<void> {
   const stored = await loadStoredState();
+  // Whatever had focus on the page before the panel opened gets it back
+  // when the panel closes; the toolbar button that opened it can't.
+  const previousFocus = document.activeElement;
   registerFonts();
 
   const host = document.createElement("div");
@@ -59,6 +62,8 @@ export async function mountPanel(): Promise<void> {
     reactRoot.unmount();
     host.remove();
     restorePage();
+    if (previousFocus instanceof HTMLElement && previousFocus.isConnected)
+      previousFocus.focus({ preventScroll: true });
   };
   reactRoot.render(
     <App

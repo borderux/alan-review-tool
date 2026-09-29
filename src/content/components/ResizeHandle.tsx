@@ -12,13 +12,20 @@ interface ResizeHandleProps {
   width: number;
   onChange: (width: number) => void;
   visible: boolean;
+  // Reports a storage write that did not go through.
+  track: (write: Promise<void>) => void;
 }
 
 // Approved exception: the kit's panel has no resize affordance, so this
 // strip on the panel's left edge is hand-built. Dragging is the main way
 // to use it; arrow keys (and Home/End) are the required non-drag way. The
 // width is remembered across sessions.
-export function ResizeHandle({ width, onChange, visible }: ResizeHandleProps) {
+export function ResizeHandle({
+  width,
+  onChange,
+  visible,
+  track,
+}: ResizeHandleProps) {
   const apply = (next: number, animate: boolean) => {
     const clamped = clamp(next, MIN_WIDTH, MAX_WIDTH);
     onChange(clamped);
@@ -37,7 +44,7 @@ export function ResizeHandle({ width, onChange, visible }: ResizeHandleProps) {
     const onUp = () => {
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
-      saveWidth(latest);
+      track(saveWidth(latest));
     };
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
@@ -52,7 +59,7 @@ export function ResizeHandle({ width, onChange, visible }: ResizeHandleProps) {
     };
     if (!(event.key in steps)) return;
     event.preventDefault();
-    saveWidth(apply(steps[event.key], true));
+    track(saveWidth(apply(steps[event.key], true)));
   };
 
   if (!visible) return null;

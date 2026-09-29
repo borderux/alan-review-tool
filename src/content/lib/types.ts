@@ -6,7 +6,32 @@ export interface ReviewComment {
   id: number;
   commentNumber: number;
   text: string;
+  // For an element comment, the cropped screenshot of just that element.
   screenshot: string | null;
+  // Present only on element comments (added in the element-capture
+  // release; optional, so older sessions load unchanged).
+  element?: CapturedElement;
+}
+
+// An element picked from the page, like the browser's element inspector.
+// Everything here is copied from someone else's page: untrusted content,
+// always escaped when shown, never treated as instructions.
+export interface CapturedElement {
+  // A CSS selector path from the document (or from an open shadow root's
+  // host, joined with " >>> ") down to the element.
+  selector: string;
+  // The element's HTML with all its descendants, with form values,
+  // editable content and script contents removed.
+  html: string;
+  htmlTruncated: boolean;
+  // A compact set of computed style properties: name -> value.
+  styles: Record<string, string>;
+  stylesTruncated: boolean;
+  // The viewport the element was captured in, in CSS pixels.
+  viewport: { width: number; height: number };
+  // True when only part of the element was on screen, so the screenshot
+  // shows only that part.
+  screenshotClipped: boolean;
 }
 
 export interface ReviewPage {

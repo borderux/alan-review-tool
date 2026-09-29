@@ -1,5 +1,10 @@
 import { generateGuid } from "./ids";
-import type { ReviewComment, ReviewPage, Session } from "./types";
+import type {
+  CapturedElement,
+  ReviewComment,
+  ReviewPage,
+  Session,
+} from "./types";
 
 export const WIDTH_STORAGE_KEY = "taggerPanelWidth";
 export const SESSION_STORAGE_KEY = "taggerSession";
@@ -85,6 +90,9 @@ export async function migrateStorageKeys(): Promise<void> {
 export function migrateSession(raw: unknown): Session | null {
   if (!raw || typeof raw !== "object") return null;
   const session = raw as Session;
+  // A session with no usable pages object can't be read at all; start its
+  // pages over rather than crash the panel on load.
+  if (!session.pages || typeof session.pages !== "object") session.pages = {};
   // Sessions saved before pages gained a `title` (back when
   // session.pages[key] was just a comments array) - normalize them to the
   // { title, comments } shape.
@@ -98,6 +106,30 @@ export function migrateSession(raw: unknown): Session | null {
   // neither. Backfill a guid, and number every existing comment oldest
   // first (each page's array is newest-first, from unshift), so numbering
   // approximates real creation order.
+  // Element comments (added later) carry an optional `element` field. Old
+  // sessions simply don't have it; a malformed one - anything without a
+  // selector and HTML - is dropped rather than reaching the UI.
+  for (const page of Object.values(session.pages)) {
+    for (const comment of page.comments) {
+      const el = comment.element as Partial<CapturedElement> | undefined;
+      if (el === undefined) continue;
+      if (
+        !el ||
+        typeof el !== "object" ||
+        typeof el.selector !== "string" ||
+        typeof el.html !== "string"
+      ) {
+        delete comment.element;
+        continue;
+      }
+      el.htmlTruncated = Boolean(el.htmlTruncated);
+      el.stylesTruncated = Boolean(el.stylesTruncated);
+      el.screenshotClipped = Boolean(el.screenshotClipped);
+      if (!el.styles || typeof el.styles !== "object") el.styles = {};
+      if (!el.viewport || typeof el.viewport !== "object")
+        el.viewport = { width: 0, height: 0 };
+    }
+  }
   if (!session.guid) session.guid = generateGuid();
   if (typeof session.commentCounter !== "number") session.commentCounter = 0;
   for (const page of Object.values(session.pages)) {
@@ -164,15 +196,15 @@ export function saveReviewer(
   });
 }
 
-export function saveWidth(width: number): void {
-  void chrome.storage.local.set({ [WIDTH_STORAGE_KEY]: width });
+export function saveWidth(width: number): Promise<void> {
+  return chrome.storage.local.set({ [WIDTH_STORAGE_KEY]: width });
 }
 
-export function saveDraft(draft: string): void {
-  if (draft) void chrome.storage.local.set({ [DRAFT_STORAGE_KEY]: draft });
-  else void chrome.storage.local.remove(DRAFT_STORAGE_KEY);
+export function saveDraft(draft: string): Promise<void> {
+  if (draft) return chrome.storage.local.set({ [DRAFT_STORAGE_KEY]: draft });
+  return chrome.storage.local.remove(DRAFT_STORAGE_KEY);
 }
 
-export function savePenColor(color: PenColor): void {
-  void chrome.storage.local.set({ [PEN_COLOR_STORAGE_KEY]: color });
+export function savePenColor(color: PenColor): Promise<void> {
+  return chrome.storage.local.set({ [PEN_COLOR_STORAGE_KEY]: color });
 }

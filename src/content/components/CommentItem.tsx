@@ -6,10 +6,14 @@ import {
   Group,
   Heading,
   Menu,
+  ReadOnlyField,
   Stack,
+  Text,
   TextArea,
   Tooltip,
 } from "@recursica/adapter-mantine-v8";
+import { formatCount } from "../lib/format";
+import { HTML_CAP } from "../lib/element";
 import { formatCommentId } from "../lib/ids";
 import type { ReviewComment } from "../lib/types";
 import { fieldLayout, type FormLayout } from "../ReviewPanel";
@@ -157,11 +161,14 @@ export function CommentItem({
 
         {hasShot && (
           <Group gap="rec-sm" wrap="nowrap">
-            {/* Decorative: the button beside it names the screenshot. */}
             <img
               className="art-thumb"
               src={comment.screenshot ?? undefined}
-              alt=""
+              alt={
+                comment.element
+                  ? `Screenshot of the element in ${id}`
+                  : `Screenshot attached to ${id}`
+              }
             />
             <Button
               variant="outline"
@@ -175,23 +182,58 @@ export function CommentItem({
           </Group>
         )}
 
-        <TextArea
-          ref={textRef}
-          // The label names the comment on its own, id included: the
-          // adapter labels the field by its visible label, so an
-          // aria-label cannot add the id.
-          label={`Comment ${id}`}
-          {...fieldLayout(formLayout)}
-          autosize
-          minRows={1}
-          placeholder={
-            hasShot
-              ? "Describe what the screenshot shows"
-              : "Describe the issue or change"
-          }
-          value={comment.text}
-          onChange={(event) => onTextChange(event.currentTarget.value)}
-        />
+        {/* The row's fields bring their own spacing, so this stack adds
+            none between them. */}
+        <Stack gap="rec-none">
+          {/* An element comment: which element, and anything cut short. The
+            full HTML and styles are in the downloaded report. */}
+          {comment.element && (
+            <>
+              <ReadOnlyField
+                label={`Element in ${id}`}
+                formLayout="stacked"
+                value={comment.element.selector}
+              />
+              {(comment.element.htmlTruncated ||
+                comment.element.stylesTruncated ||
+                comment.element.screenshotClipped) && (
+                <Stack maw={320}>
+                  <Text variant="caption" emphasis="low">
+                    {[
+                      comment.element.htmlTruncated &&
+                        `HTML truncated to ${formatCount(HTML_CAP)} characters`,
+                      comment.element.stylesTruncated && "Styles truncated",
+                      comment.element.screenshotClipped &&
+                        "Screenshot shows only the part that was on screen",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </Text>
+                </Stack>
+              )}
+            </>
+          )}
+
+          <TextArea
+            ref={textRef}
+            // The label names the comment on its own, id included: the
+            // adapter labels the field by its visible label, so an
+            // aria-label cannot add the id.
+            label={`Comment ${id}`}
+            {...fieldLayout(formLayout)}
+            autosize
+            minRows={1}
+            placeholder={
+              comment.element
+                ? "Describe what's wrong with this element"
+                : hasShot
+                  ? "Describe what the screenshot shows"
+                  : "Describe the issue or change"
+            }
+            value={comment.text}
+            onChange={(event) => onTextChange(event.currentTarget.value)}
+          />
+        </Stack>
       </Stack>
     </li>
   );

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { generateGuid } from "./lib/ids";
 import { saveReviewer, saveSession } from "./lib/storage";
-import type { ReviewComment, Session } from "./lib/types";
+import type { CapturedElement, ReviewComment, Session } from "./lib/types";
 
 // Structural changes (a new, deleted or duplicated comment, a capture, a
 // start over) save immediately. Plain typing saves after a pause instead,
@@ -123,7 +123,12 @@ export function useReviewSession({
   // returns its id. The CM-<n> counter only ever goes up, even across
   // deletes: CM-<n> plus the session guid is a permanent id.
   const addComment = useCallback(
-    (pageKey: string, text = "", screenshot: string | null = null) => {
+    (
+      pageKey: string,
+      text = "",
+      screenshot: string | null = null,
+      element?: CapturedElement,
+    ) => {
       const base = latest.current ?? newSession();
       const commentNumber = base.commentCounter + 1;
       const comment: ReviewComment = {
@@ -131,6 +136,7 @@ export function useReviewSession({
         commentNumber,
         text,
         screenshot,
+        ...(element ? { element } : {}),
       };
       commit(
         withPageComments(
@@ -147,7 +153,7 @@ export function useReviewSession({
 
   const duplicateComment = useCallback(
     (pageKey: string, source: ReviewComment) =>
-      addComment(pageKey, source.text, source.screenshot),
+      addComment(pageKey, source.text, source.screenshot, source.element),
     [addComment],
   );
 
@@ -223,7 +229,22 @@ export function useReviewSession({
     [scheduleReviewerSave],
   );
 
+  // Anything still waiting on the typing delay is written as soon as the
+  // page is being hidden or unloaded, so a refresh never loses typing.
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onHide);
+    };
+  }, [flush]);
+
   return {
+    track,
     session,
     userName,
     userEmail,
