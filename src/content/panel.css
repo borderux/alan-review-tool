@@ -163,8 +163,7 @@
 /* Pen colour swatches: beside each colour's name in the pen color
    dropdown, and at the start of the closed field. These colours are baked
    into the screenshot, so they are fixed values that cannot follow the
-   theme; the name in each label carries the meaning, and the radio's own
-   selected state shows the choice. The border keeps white and black
+   theme; the name beside each swatch carries the meaning. The border keeps white and black
    swatches visible on either theme. */
 .art-swatch {
   display: inline-block;

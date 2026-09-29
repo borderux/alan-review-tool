@@ -8,6 +8,7 @@ import AI_INSTRUCTIONS from "../../ai-report-instructions.txt?raw";
 import { HTML_CAP } from "./element";
 import { formatCount, formatDateTimeWithZone, plural } from "./format";
 import { commentName, formatCommentId } from "./ids";
+import type { RecursicaDetection } from "./recursica";
 import type { CapturedElement, Session } from "./types";
 
 function escapeHtml(str: string): string {
@@ -31,6 +32,48 @@ function elementHtml(el: CapturedElement): string {
     .map(([name, value]) => `${name}: ${value};`)
     .join("\n");
   return `<div class="comment-element"><p class="element-selector"><code>${escapeHtml(el.selector)}</code></p><p class="element-meta">Viewport ${formatCount(el.viewport.width)} × ${formatCount(el.viewport.height)}</p>${notes.map((n) => `<p class="element-note">${escapeHtml(n)}</p>`).join("")}<details class="element-html"><summary>HTML</summary><pre><code>${escapeHtml(el.html)}</code></pre></details><details class="element-styles"><summary>Styles</summary><pre><code>${escapeHtml(styles)}</code></pre></details></div>`;
+}
+
+// A page's Recursica line: what was detected about the reviewed page (not
+// about Snippy), in words and as data attributes an AI can parse. Pages
+// whose comments predate detection say "not checked". All values are
+// page-derived; they were validated against a version pattern on the way
+// in and are escaped here.
+function recursicaLine(d: RecursicaDetection | undefined): string {
+  if (!d)
+    return `<p class="page-recursica" data-recursica="not-checked">Recursica: not checked</p>`;
+  const attrs = [
+    `data-recursica="${d.recursica ? "yes" : "no"}"`,
+    d.forgeVersion && `data-forge-version="${escapeHtml(d.forgeVersion)}"`,
+    d.transformVersion &&
+      `data-transform-version="${escapeHtml(d.transformVersion)}"`,
+    d.adapterVersion &&
+      `data-adapter-version="${escapeHtml(d.adapterVersion)}"`,
+    d.themeMode && `data-theme-mode="${d.themeMode}"`,
+    d.layers && `data-layers="${d.layers.join(",")}"`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  if (!d.recursica)
+    return `<p class="page-recursica" ${attrs}>Recursica: not detected</p>`;
+  const parts = ["yes"];
+  parts.push(
+    d.forgeVersion
+      ? `Forge ${escapeHtml(d.forgeVersion)}${d.transformVersion ? ` (transform ${escapeHtml(d.transformVersion)})` : ""}`
+      : "Forge version not detected",
+  );
+  parts.push(
+    d.adapterVersion
+      ? `adapter ${escapeHtml(d.adapterVersion)}`
+      : "adapter not detected",
+  );
+  if (d.themeMode)
+    parts.push(
+      d.themeMode === "mixed"
+        ? "light and dark themes"
+        : `${d.themeMode} theme`,
+    );
+  return `<p class="page-recursica" ${attrs}>Recursica: ${parts.join(", ")}</p>`;
 }
 
 export function totalCommentCount(session: Session | null): number {
@@ -101,6 +144,7 @@ export function buildReportHtml({
       const urlWithoutSearch = url.split("?")[0];
       return `<div class="page-section" id="page-${i}">
 <h2 class="page-url"><a href="${escapeHtml(url)}">${escapeHtml(urlWithoutSearch)}</a></h2>
+${recursicaLine(page.recursica)}
 ${commentsHtml}
 </div>`;
     })
@@ -113,6 +157,9 @@ ${commentsHtml}
 <title>Snippy report</title>
 ${session?.guid ? `<meta name="snippy-session-id" content="${escapeHtml(session.guid)}">` : ""}
 <meta name="snippy-version" content="${escapeHtml(__APP_VERSION__)}">
+<meta name="snippy-built-with-adapter-version" content="${escapeHtml(__ADAPTER_VERSION__)}">
+<meta name="snippy-built-with-forge-version" content="${escapeHtml(__FORGE_VERSION__)}">
+<meta name="snippy-built-with-transform-version" content="${escapeHtml(__TRANSFORM_VERSION__)}">
 <meta name="ai-report-instructions" content="${escapeHtml(AI_INSTRUCTIONS)}">
 <style>${REPORT_CSS}</style>
 </head>
@@ -123,6 +170,7 @@ ${session?.guid ? `<meta name="snippy-session-id" content="${escapeHtml(session.
 ${userName ? `<p class="report-meta">Reviewer: ${escapeHtml(userName)}</p>` : ""}
 ${userEmail ? `<p class="report-meta">Email: ${escapeHtml(userEmail)}</p>` : ""}
 ${session?.details ? `<p class="report-meta">Details: ${escapeHtml(session.details)}</p>` : ""}
+<p class="report-meta report-built-with">Snippy ${escapeHtml(__APP_VERSION__)} built with: @recursica/adapter-mantine-v8 ${escapeHtml(__ADAPTER_VERSION__)}, Forge theme ${escapeHtml(__FORGE_VERSION__)} (transform ${escapeHtml(__TRANSFORM_VERSION__)})</p>
 </div>
 <nav class="toc">
 <h2>Pages reviewed</h2>

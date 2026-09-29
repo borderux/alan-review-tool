@@ -1,4 +1,5 @@
 import { generateGuid } from "./ids";
+import { sanitizeDetection } from "./recursica";
 import type {
   CapturedElement,
   ReviewComment,
@@ -40,10 +41,9 @@ export const PEN_COLORS = [
 export type PenColor = (typeof PEN_COLORS)[number];
 export const DEFAULT_PEN_COLOR: PenColor = "red";
 
-// The panel's three tabs need about 330px before they wrap onto a second
-// row, and navigation must never wrap. The minimum was 240px before the
-// tabs existed; a stored width below the new minimum is clamped up. The
-// owner approved this range (336-720, default 360) with the resize strip.
+// The owner approved this range (336-720, default 360) with the resize
+// strip; a stored width below the minimum is clamped up. (The minimum was
+// first raised from 240px when the panel had tabs; it stayed when they went.)
 export const DEFAULT_WIDTH = 360;
 export const MIN_WIDTH = 336;
 export const MAX_WIDTH = 720;
@@ -108,6 +108,14 @@ export function migrateSession(raw: unknown): Session | null {
   // neither. Backfill a guid, and number every existing comment oldest
   // first (each page's array is newest-first, from unshift), so numbering
   // approximates real creation order.
+  // Pages may carry an optional `recursica` detection (added later): kept
+  // only if well-formed, field by field; anything else is dropped.
+  for (const page of Object.values(session.pages)) {
+    if (!("recursica" in page)) continue;
+    const clean = sanitizeDetection(page.recursica);
+    if (clean) page.recursica = clean;
+    else delete page.recursica;
+  }
   // Element comments (added later) carry an optional `element` field. Old
   // sessions simply don't have it; a malformed one - anything without a
   // selector and HTML - is dropped rather than reaching the UI.

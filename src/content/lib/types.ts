@@ -1,3 +1,5 @@
+import type { RecursicaDetection } from "./recursica";
+
 // The stored shape of a review session. This is exactly what already sits
 // in real users' chrome.storage.local - see ARCHITECTURE.md's Data model
 // section. Changing it needs a migration in storage.ts.
@@ -37,6 +39,10 @@ export interface CapturedElement {
 export interface ReviewPage {
   title: string;
   comments: ReviewComment[];
+  // Whether the page is built with Recursica, and which versions (added
+  // with version detection; optional, so older sessions load unchanged).
+  // Page-derived, untrusted. See lib/recursica.ts.
+  recursica?: RecursicaDetection;
 }
 
 export interface Session {

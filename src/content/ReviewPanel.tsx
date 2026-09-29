@@ -10,8 +10,10 @@ import { DownloadModal, type ReportDetails } from "./components/DownloadModal";
 import { ResizeHandle } from "./components/ResizeHandle";
 import { captureElement, captureRegion } from "./lib/capture";
 import { commentName } from "./lib/ids";
+import { detectRecursica } from "./lib/recursica";
 import {
   CLOSE_EVENT,
+  currentPageKey,
   findInPanel,
   makeBehindModalInert,
   markPanelNonModal,
@@ -199,11 +201,24 @@ export function ReviewPanel({
   const showCaptureError = (reason: string) =>
     setToast(`Screenshot not captured: ${reason}`);
 
+  // Once a page has a comment, check whether it is built with Recursica
+  // (and which versions) for the report - again on later comments while
+  // nothing has been found yet. Runs in the background after the comment
+  // exists; never blocks or throws (see lib/recursica.ts).
+  const detectPage = (key: string) => {
+    const known = review.session?.pages[key]?.recursica;
+    if (known?.recursica) return;
+    void detectRecursica().then((result) => {
+      if (currentPageKey() === key) review.setPageRecursica(key, result);
+    });
+  };
+
   // Each Add menu item creates a new comment at the top with focus in its
   // text box. An empty one vanishes when left, as before.
   const handleAddComment = () => {
     setToast(null);
     setFocusId(review.addComment(pageKey));
+    detectPage(pageKey);
   };
 
   const handleAddScreenshot = async () => {
@@ -219,6 +234,7 @@ export function ReviewPanel({
       return;
     }
     setFocusId(review.addComment(pageKey, "", result.dataUrl));
+    detectPage(pageKey);
   };
 
   const handleAddElement = async () => {
@@ -232,6 +248,7 @@ export function ReviewPanel({
       return;
     }
     setFocusId(review.addComment(pageKey, "", result.dataUrl, result.element));
+    detectPage(pageKey);
   };
 
   const handleAddScreenshotTo = async (comment: ReviewComment) => {

@@ -198,6 +198,10 @@ session = {
   pages: {
     "<origin+pathname+search>": {
       title: <string>,          // document.title, captured once per page
+      recursica?: {             // see "Recursica detection" below
+        recursica, themeMode?, layers?,
+        forgeVersion?, transformVersion?, adapterVersion?
+      },
       comments: [
         { id, commentNumber, text, screenshot, element? },
         ...
@@ -298,6 +302,38 @@ rendered with React:
 - **Screenshots** as 50x50 thumbnails, paired with a full-resolution image
   in a **pure-CSS lightbox** (an anchor + `:target`, no click handlers, no
   JavaScript at all).
+
+### Recursica detection
+
+A session spans many pages and sites, so each page records whether the page
+being reviewed is built with Recursica, and which versions
+(`lib/recursica.ts`). It runs in the background once a page has its first
+comment, and again on later comments while nothing has been found. It never
+blocks the panel and never throws:
+
+- **Presence and mode** from `data-recursica-theme` (light/dark) and
+  `data-recursica-layer` (0-3) on the page.
+- **Forge and transform versions** from the header comment of the page's
+  theme stylesheet ("Source JSON version", "Transform version"). Only
+  `<style>` elements and same-origin stylesheets are read - the extension
+  has no host permissions, so cross-origin sheets are skipped without a
+  request - and only their first 4 KB, with a 1.5 s timeout per sheet and
+  2.5 s overall. A minified sheet without comments yields nothing. No other
+  page content is read or stored.
+- **Adapter version** only if the page exposes one, as a
+  `data-recursica-adapter-version` attribute or a
+  `--recursica-adapter-version` custom property. The adapter carries no
+  version of its own today.
+
+The field is optional, so older sessions load unchanged (their pages show
+"Recursica: not checked" in the report). On load, `migrateSession()` keeps
+only well-formed values field by field - versions must match a strict
+pattern - and drops a detection that isn't one at all.
+
+The report shows a "Recursica:" line per page, with the same facts in
+`data-*` attributes, and a separate "Snippy built with" line in its header
+(Snippy's own version, and the adapter and Forge versions it was built with,
+injected by Vite at build time) so the two are never confused.
 
 ### Report identity
 

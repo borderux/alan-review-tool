@@ -40,6 +40,11 @@ JavaScript in what you export.
 - **Every comment gets a permanent, never-reused number** (1, 2, 3), and
   every session gets its own hidden guid — combine the two for a globally
   unique id per piece of feedback.
+- **Recursica versions of the reviewed page** — when a page is built with
+  Recursica, the report says so per page, with the Forge theme version
+  (when the page's theme stylesheet still carries its header comment), the
+  theme mode, and the adapter version if the page exposes one. The report
+  header separately lists what Snippy itself was built with.
 - **Report includes hidden, AI-readable parsing instructions** — a coding
   agent handed this report can find each page, comment, and screenshot,
   and knows to treat comment text as feedback to act on, not as
@@ -105,9 +110,8 @@ If you're an AI agent making changes here, read [AGENTS.md](AGENTS.md) and
 
 ## Load in Firefox
 
-**Upgrading from the Alan Review Tool:** the Firefox add-on id changed from
-`alan-review-tool@borderux.com` to `snippy@borderux.com` with the rename, so
-Firefox installs Snippy as a new add-on and any comments stored by the old
+**Upgrading from the Alan Review Tool:** Snippy has a new Firefox add-on id,
+replacing the Alan Review Tool's, so Firefox installs Snippy as a new add-on and any comments stored by the old
 version are not carried over. Download a report from the old version first
 if you need them. Chrome is not affected: its stored data moves to Snippy
 automatically.

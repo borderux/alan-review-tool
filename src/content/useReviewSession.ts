@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { generateGuid } from "./lib/ids";
 import { saveReviewer, saveSession } from "./lib/storage";
+import type { RecursicaDetection } from "./lib/recursica";
 import type { CapturedElement, ReviewComment, Session } from "./lib/types";
 
 // Structural changes (a new, deleted or duplicated comment, a capture, a
@@ -177,6 +178,24 @@ export function useReviewSession({
     [commit],
   );
 
+  // Records the page's Recursica detection. Saved at once; nothing else
+  // on the page changes.
+  const setPageRecursica = useCallback(
+    (pageKey: string, recursica: RecursicaDetection) => {
+      const current = latest.current;
+      const page = current?.pages[pageKey];
+      if (!current || !page) return;
+      commit(
+        {
+          ...current,
+          pages: { ...current.pages, [pageKey]: { ...page, recursica } },
+        },
+        "now",
+      );
+    },
+    [commit],
+  );
+
   const deleteComment = useCallback(
     (pageKey: string, id: number) => {
       const current = latest.current;
@@ -253,6 +272,7 @@ export function useReviewSession({
     duplicateComment,
     updateComment,
     deleteComment,
+    setPageRecursica,
     setDetails,
     startOver,
     setUserName,

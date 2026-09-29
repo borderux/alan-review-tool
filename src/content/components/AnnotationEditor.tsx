@@ -58,6 +58,11 @@ export function AnnotationEditor({
   const last = useRef<{ x: number; y: number } | null>(null);
   const [hasDrawing, setHasDrawing] = useState(false);
   const saveReasonId = useId();
+  // While the pen color list is open, Escape belongs to the list: it closes
+  // the list, not the whole editor (which would throw the drawing away).
+  // Mantine closes the modal from a capture listener on window, before the
+  // list sees the key, so the modal must be told not to.
+  const [penListOpen, setPenListOpen] = useState(false);
 
   const sizeCanvases = () => {
     const img = imgRef.current;
@@ -162,6 +167,7 @@ export function AnnotationEditor({
       portalProps={{ target }}
       // A click on the backdrop must never throw away a drawing.
       closeOnClickOutside={false}
+      closeOnEscape={!penListOpen}
       // Focus return is done by the panel: inside a shadow root, Mantine
       // records the host element as the trigger.
       returnFocus={false}
@@ -175,6 +181,8 @@ export function AnnotationEditor({
             formLayout="stacked"
             data-autofocus
             allowDeselect={false}
+            onDropdownOpen={() => setPenListOpen(true)}
+            onDropdownClose={() => setPenListOpen(false)}
             // The option list renders with the modal (layer 1), not in the
             // page-level portal, which is inert and underneath while a modal
             // is open.

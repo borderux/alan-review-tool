@@ -54,10 +54,41 @@ const themeCssPath = path.join(
   "node_modules/@recursica/adapter-mantine-v8/recursica_variables_scoped.css",
 );
 
+// What Snippy itself is built with, for the report header ("Snippy built
+// with"): the adapter's package version, and the Forge versions from the
+// bundled theme stylesheet's header comment. A missing value fails the
+// build rather than shipping a wrong one.
+const adapterVersion = (
+  JSON.parse(
+    readFileSync(
+      path.join(
+        rootDir,
+        "node_modules/@recursica/adapter-mantine-v8/package.json",
+      ),
+      "utf8",
+    ),
+  ) as { version: string }
+).version;
+const themeHeader = readFileSync(themeCssPath, "utf8").slice(0, 2048);
+const headerVersion = (label: string) => {
+  const match = new RegExp(`${label}:\\s*([0-9][\\w.+-]*)`).exec(themeHeader);
+  if (!match) throw new Error(`The theme stylesheet has no "${label}" header.`);
+  return match[1];
+};
+
 function versionDefine(): VitePlugin {
   return {
     name: "snippy-version",
-    config: () => ({ define: { __APP_VERSION__: JSON.stringify(version) } }),
+    config: () => ({
+      define: {
+        __APP_VERSION__: JSON.stringify(version),
+        __ADAPTER_VERSION__: JSON.stringify(adapterVersion),
+        __FORGE_VERSION__: JSON.stringify(headerVersion("Source JSON version")),
+        __TRANSFORM_VERSION__: JSON.stringify(
+          headerVersion("Transform version"),
+        ),
+      },
+    }),
   };
 }
 
