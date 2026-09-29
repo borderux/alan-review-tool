@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Button,
   Modal,
@@ -37,6 +37,7 @@ export function DownloadModal({
   const [values, setValues] = useState(initial);
   // Checked when the reviewer leaves the field, never while typing.
   const [emailInvalid, setEmailInvalid] = useState(false);
+  const emailRef = useRef<HTMLInputElement>(null);
   const set = (key: keyof ReportDetails) => (value: string) =>
     setValues((v) => ({ ...v, [key]: value }));
   const emailOk =
@@ -65,6 +66,7 @@ export function DownloadModal({
           onChange={(event) => set("userName")(event.currentTarget.value)}
         />
         <TextField
+          ref={emailRef}
           label="Reviewer email"
           type="email"
           formLayout="stacked"
@@ -99,15 +101,16 @@ export function DownloadModal({
         <Button variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        {/* Disabled only while the email error is showing, so the reason is
-            always in text under the field. A badly formed email that hasn't
-            been checked yet is checked on click instead of downloading. */}
+        {/* Never disabled: disabling it as the email field loses focus would
+            drop focus on the way to it. A badly formed email is caught on
+            click instead - the error shows under the field and focus goes
+            there - and nothing downloads. */}
         <Button
           variant="solid"
-          disabled={emailInvalid}
           onClick={() => {
             if (!emailOk) {
               setEmailInvalid(true);
+              emailRef.current?.focus();
               return;
             }
             onDownload({

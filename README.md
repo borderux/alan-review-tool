@@ -12,11 +12,13 @@ JavaScript in what you export.
   domain or embedded snippet.
 - **Comments and screenshots**, grouped into a single review **session**
   that spans every page visited, not scoped to one tab or one origin.
-- **One Add menu** — Comment, Screenshot or Element. Each creates a new
-  numbered comment at the top of the list, with focus in its text box.
+- **One Add menu** — the plus button in the panel header offers Comment,
+  Screenshot or Element. Each creates a new numbered comment at the top of
+  the list, with focus in its text box.
 - **Screenshot capture with freehand annotation** — drag-select any region
-  of the page, then use Add annotations to draw on it in one of six
-  colors (red by default; the last choice is remembered). Every stroke
+  of the page, then use Add annotations to draw on it, choosing one of six
+  pen colors from a dropdown (red by default; the last choice is
+  remembered). Every stroke
   has a thin contrasting outline so it shows on light and dark
   screenshots. Save annotations bakes the drawing into the image.
 - **Element capture** — Add, then Element, lets you pick any element on the page,

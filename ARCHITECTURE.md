@@ -36,11 +36,15 @@ Recursica design system and bundled by Vite into one content script;
     the Recursica layer-0 scope.
   - `ReviewPanel.tsx` - the panel shell: open/close, Escape, focus, the
     footer (Start over, Download report), toast and modals.
-  - `components/` - the one view (`CommentList`: a pinned toolbar with a
-    single Add menu - Comment, Screenshot, Element - and the comment list),
+  - `components/` - the one view (`CommentList`, the comment list), the
+    Add menu (`AddMenu`: a large icon-only plus button in the panel header,
+    left of the title, rendered into a slot placed first in the header -
+    Comment, Screenshot, Element),
     a comment row with its action menu, the download modal (reviewer
     name, email and session details, every time a report is downloaded),
-    the annotation editor, the shared confirmation modal, the resize strip,
+    the annotation editor (a fixed toolbar with the pen color dropdown and
+    Clear annotations above a scrolling image area), the shared
+    confirmation modal, the resize strip,
     and `useManagedMenu` (menu focus handling that works in a shadow root).
   - `useReviewSession.ts` - all session state and saving.
   - `modalPortal.ts` - hands every modal its layer-1 portal container.

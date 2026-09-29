@@ -44,39 +44,12 @@
   z-index: 1001;
 }
 
-/* The parts of the panel that stay put while the tab content scrolls: the
-   toolbar with the Add menu. The panel body is the one scroll container
-   (the approved scroll exception); the toolbar sticks to its top. It needs
-   an opaque background so content scrolls underneath it, taken from the
-   panel's own background token. No kit component pins part of a panel, so
-   this is a reported gap. */
-.art-pinned {
-  position: sticky;
-  z-index: 2;
-  background-color: var(
-    --recursica_ui-kit_components_panel_properties_colors_background-color
-  );
-}
-/* The toolbar sticks at the very top of the panel body, covering the
-   body's own top padding too: a sticky element otherwise stops below that
-   padding, and rows would show through the gap above it. The negative
-   margin keeps its resting position unchanged. */
-.art-pinned-top {
-  top: calc(
-    var(
-        --recursica_ui-kit_components_panel_properties_content-vertical-padding
-      ) *
-      -1
-  );
-  margin-top: calc(
-    var(
-        --recursica_ui-kit_components_panel_properties_content-vertical-padding
-      ) *
-      -1
-  );
-  padding-top: var(
-    --recursica_ui-kit_components_panel_properties_content-vertical-padding
-  );
+/* The slot at the start of the panel header that holds the Add menu, to
+   the left of the title. The header's own gap spaces it from the title. */
+.art-header-slot {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 /* A comment's supporting material - its screenshot, or the screenshot of
@@ -90,20 +63,31 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--recursica_brand_dimensions_general_sm);
-  align-self: flex-start;
-  max-width: 100%;
-  padding: var(--recursica_brand_dimensions_general_sm);
+  gap: var(--recursica_brand_dimensions_general_md);
+  /* Exactly the width of the Comment text box beneath it, at every panel
+     width: the full content width, up to the same token that caps the
+     stacked text box (so on a wide panel both stop at that width). */
+  align-self: stretch;
+  width: 100%;
+  max-width: var(
+    --recursica_ui-kit_components_textarea_variants_layouts_stacked_properties_max-width
+  );
+  box-sizing: border-box;
+  padding: var(--recursica_brand_dimensions_general_lg);
   border: var(--recursica_ui-kit_components_panel_properties_border-size) solid
     var(--recursica_ui-kit_components_panel_properties_colors_border-color);
   border-radius: var(--recursica_brand_dimensions_border-radii_default);
 }
+/* The image scales to the frame's width, keeping its aspect ratio - never
+   stretched or cropped. A very tall one stops at the max height and is
+   letterboxed, so it can't push the rest of the list far down. */
 .art-thumb {
   display: block;
-  width: 240px;
-  max-width: 100%;
-  height: 135px;
+  width: 100%;
+  height: auto;
+  max-height: 320px;
   object-fit: contain;
+  object-position: left top;
 }
 
 /* The comment list: one group per comment, separated by a divider line
@@ -121,7 +105,28 @@
   border-top: var(--recursica_ui-kit_components_panel_properties_divider-size)
     solid
     var(--recursica_ui-kit_components_panel_properties_colors_divider-color);
-  padding-top: var(--recursica_brand_dimensions_general_lg);
+  padding-top: var(--recursica_brand_dimensions_general_xl);
+}
+
+/* The annotation editor's image area: the only part of the editor that
+   scrolls, beneath its fixed toolbar (pen color, Clear annotations). The
+   image shows at up to the modal's width and scrolls when it is taller
+   than the area; the drawing layers scroll with it, so they stay aligned. */
+.art-shot-scroll {
+  max-height: 55vh;
+  overflow: auto;
+}
+
+/* Text for screen readers only: the reason Save annotations starts
+   disabled, as the button's accessible description (no visible helper
+   text, by owner decision). */
+.art-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* The screenshot and its two drawing layers in the annotation editor. The
@@ -140,7 +145,6 @@
 .art-shot img {
   display: block;
   max-width: 100%;
-  max-height: 60vh;
 }
 .art-shot canvas {
   position: absolute;
@@ -156,7 +160,8 @@
   pointer-events: none;
 }
 
-/* Pen colour swatches beside each colour's name. These colours are baked
+/* Pen colour swatches: beside each colour's name in the pen color
+   dropdown, and at the start of the closed field. These colours are baked
    into the screenshot, so they are fixed values that cannot follow the
    theme; the name in each label carries the meaning, and the radio's own
    selected state shows the choice. The border keeps white and black
@@ -169,7 +174,6 @@
   border: var(--recursica_brand_layer_1_properties_border-size, 1px) solid
     var(--recursica_brand_layer_1_properties_border-color);
   vertical-align: middle;
-  margin-right: var(--recursica_brand_dimensions_general_sm);
 }
 
 /* Where a toast appears: over the page, at its bottom-left, so it never

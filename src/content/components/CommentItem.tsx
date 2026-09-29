@@ -88,7 +88,7 @@ export function CommentItem({
 
   return (
     <li className="art-row" onBlur={onBlur}>
-      <Stack gap="rec-sm">
+      <Stack gap="rec-lg">
         <Group justify="space-between" wrap="nowrap" gap="rec-sm">
           <Heading
             order={3}

@@ -1,13 +1,11 @@
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import {
   Button,
+  Dropdown,
   Group,
   Modal,
-  Radio,
-  RadioGroup,
   Stack,
-  Text,
 } from "@recursica/adapter-mantine-v8";
 import { commentName } from "../lib/ids";
 import { OUTLINE_PX, PEN, STROKE_PX } from "../lib/pen";
@@ -22,6 +20,18 @@ interface AnnotationEditorProps {
   onCancel: () => void;
   onSave: (dataUrl: string) => void;
   onRequestDeleteScreenshot: () => void;
+}
+
+// The pen colour's swatch: the one inline colour, since the pen colour is
+// baked into screenshots and cannot be a theme token.
+function swatch(color: PenColor) {
+  return (
+    <span
+      className="art-swatch"
+      style={{ backgroundColor: PEN[color].stroke }}
+      aria-hidden
+    />
+  );
 }
 
 // A comment's screenshot, full size, with freehand drawing on top.
@@ -47,6 +57,7 @@ export function AnnotationEditor({
   const strokeRef = useRef<HTMLCanvasElement>(null);
   const last = useRef<{ x: number; y: number } | null>(null);
   const [hasDrawing, setHasDrawing] = useState(false);
+  const saveReasonId = useId();
 
   const sizeCanvases = () => {
     const img = imgRef.current;
@@ -157,22 +168,32 @@ export function AnnotationEditor({
       closeButtonProps={{ "aria-label": "Close screenshot without saving" }}
     >
       <Stack gap="rec-default">
-        <Stack gap="rec-sm">
-          {/* The reason Save annotations and Clear annotations start
-              disabled, in text. */}
-          {/* Clear annotations sits with the drawing it clears, not in the
-              footer, so the footer's three actions fit a narrow window. */}
-          <Group justify="space-between" gap="rec-sm" wrap="wrap">
-            <Text>Drag on the screenshot to draw</Text>
-            <Button
-              variant="text"
-              // Always enabled: disabling itself on click would drop keyboard
-              // focus. With nothing drawn it simply does nothing.
-              onClick={clearDrawing}
-            >
-              Clear annotations
-            </Button>
-          </Group>
+        {/* The toolbar stays put; only the image area beneath it scrolls. */}
+        <Group justify="space-between" align="flex-end" gap="rec-default">
+          <Dropdown
+            label="Pen color"
+            formLayout="stacked"
+            data-autofocus
+            allowDeselect={false}
+            // The option list renders with the modal (layer 1), not in the
+            // page-level portal, which is inert and underneath while a modal
+            // is open.
+            comboboxProps={{ portalProps: { target } }}
+            data={PEN_COLORS.map((color) => ({
+              value: color,
+              label: PEN[color].name,
+              leadingIcon: swatch(color),
+            }))}
+            value={penColor}
+            // The closed field shows the chosen colour as well as its name.
+            leftSection={swatch(penColor)}
+            onChange={(value) => value && onPenColorChange(value as PenColor)}
+          />
+          <Button variant="text" onClick={clearDrawing}>
+            Clear annotations
+          </Button>
+        </Group>
+        <div className="art-shot-scroll">
           <div className="art-shot">
             <img
               ref={imgRef}
@@ -191,44 +212,13 @@ export function AnnotationEditor({
               onPointerCancel={stopDrawing}
             />
           </div>
-        </Stack>
-        {/* A choice of one from six: a radio group laid out as a row under
-            the image (an approved exception to the vertical-radio rule).
-            Still one radio group - one tab stop, arrow keys move and
-            select - and the selected state is the radio's own dot and
-            checked state, never the swatch colour alone. The row wraps
-            when the modal is narrow. */}
-        <RadioGroup
-          label="Pen color"
-          formLayout="stacked"
-          value={penColor}
-          onChange={(value) => onPenColorChange(value as PenColor)}
-        >
-          <Group gap="rec-default" wrap="wrap">
-            {PEN_COLORS.map((color) => (
-              <Radio
-                key={color}
-                value={color}
-                // Initial focus: the first field in the editor, on the
-                // current choice.
-                {...(color === penColor ? { "data-autofocus": true } : {})}
-                label={
-                  <>
-                    <span
-                      className="art-swatch"
-                      // The one inline colour: the pen colour itself, which
-                      // is baked into screenshots and cannot be a theme token.
-                      style={{ backgroundColor: PEN[color].stroke }}
-                      aria-hidden
-                    />
-                    {PEN[color].name}
-                  </>
-                }
-              />
-            ))}
-          </Group>
-        </RadioGroup>
+        </div>
       </Stack>
+      {/* The reason Save annotations starts disabled, for screen readers
+          only (no visible helper text, by owner decision). */}
+      <span id={saveReasonId} className="art-sr-only">
+        Draw on the screenshot to enable Save annotations.
+      </span>
       {/* Every button is a direct child of the footer, so the modal's own
           button gap applies throughout. The rarely used Delete screenshot
           sits at the bottom left, pushed apart from Cancel and Save by the
@@ -241,7 +231,12 @@ export function AnnotationEditor({
         <Button variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button variant="solid" disabled={!hasDrawing} onClick={save}>
+        <Button
+          variant="solid"
+          disabled={!hasDrawing}
+          aria-describedby={hasDrawing ? undefined : saveReasonId}
+          onClick={save}
+        >
           Save annotations
         </Button>
       </Modal.Footer>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { Button, Group, Panel, Toast } from "@recursica/adapter-mantine-v8";
+import { AddMenu } from "./components/AddMenu";
 import { AnnotationEditor } from "./components/AnnotationEditor";
 import { CommentList, type CaptureTarget } from "./components/CommentList";
 import { ConfirmModal } from "./components/ConfirmModal";
@@ -70,6 +71,9 @@ export function ReviewPanel({
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [annotateId, setAnnotateId] = useState<number | null>(null);
   const [downloadOpen, setDownloadOpen] = useState(false);
+  // Where the Add menu renders: a slot at the start of the panel header,
+  // before the title (see below).
+  const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
   const [penColor, setPenColor] = useState<PenColor>(stored.penColor);
   const [focusId, setFocusId] = useState<number | null>(null);
   const [captureTarget, setCaptureTarget] = useState<CaptureTarget>(null);
@@ -97,6 +101,25 @@ export function ReviewPanel({
   useEffect(() => {
     if (opened) markPanelNonModal(host);
   }, [host, opened]);
+
+  // The Add menu sits in the panel header, left of the title. The kit's
+  // panel header has a title and a close button and no slot for anything
+  // else, and putting a button inside the title would make the panel's
+  // accessible name "Add Snippy". So a slot element is placed first in the
+  // header and the menu is rendered into it (a reported gap: no header
+  // actions slot on Panel).
+  useEffect(() => {
+    const header = findInPanel(host, ".mantine-Drawer-header");
+    if (!header) return;
+    const slot = document.createElement("div");
+    slot.className = "art-header-slot";
+    header.prepend(slot);
+    const frame = requestAnimationFrame(() => setHeaderSlot(slot));
+    return () => {
+      cancelAnimationFrame(frame);
+      slot.remove();
+    };
+  }, [host]);
 
   // While a modal is open, everything behind it is inert - the host page
   // and the panel itself - so a screen reader's reading cursor can't wander
@@ -218,14 +241,19 @@ export function ReviewPanel({
     const result = await captureRegion(host);
     capturing.current = false;
     setCaptureTarget(null);
-    if (result && "error" in result) showCaptureError(result.error);
-    else if (result)
-      review.updateComment(
-        pageKey,
-        comment.id,
-        { screenshot: result.dataUrl },
-        "now",
-      );
+    // Cancelled or failed: focus goes back to this row's Add screenshot
+    // button, which is still there.
+    if (!result || "error" in result) {
+      if (result) showCaptureError(result.error);
+      returnFocus(`[data-shot-add="${comment.id}"]`, ADD_MENU);
+      return;
+    }
+    review.updateComment(
+      pageKey,
+      comment.id,
+      { screenshot: result.dataUrl },
+      "now",
+    );
     setFocusId(comment.id);
   };
 
@@ -366,9 +394,6 @@ export function ReviewPanel({
           onFocused={() => setFocusId(null)}
           capturing={capturing}
           captureTarget={captureTarget}
-          onAddComment={handleAddComment}
-          onAddScreenshot={handleAddScreenshot}
-          onAddElement={handleAddElement}
           onAddScreenshotTo={handleAddScreenshotTo}
           onDuplicate={handleDuplicate}
           onRequestDelete={(comment) =>
@@ -441,6 +466,17 @@ export function ReviewPanel({
         onCancel={cancelConfirmation}
         onConfirm={confirm}
       />
+      {headerSlot &&
+        createPortal(
+          <AddMenu
+            busy={captureTarget === "screenshot" || captureTarget === "element"}
+            onAddComment={handleAddComment}
+            onAddScreenshot={handleAddScreenshot}
+            onAddElement={handleAddElement}
+          />,
+          headerSlot,
+        )}
+
       {downloadOpen && (
         <DownloadModal
           initial={{
