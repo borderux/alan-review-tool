@@ -136,7 +136,7 @@ export function CommentsTab({
       {/* The list shows this page only; say so, and what the report
           covers, so the narrowing is never silent. */}
       {totalCount > 0 && (
-        <Stack maw={320}>
+        <Stack maw={300}>
           <Text variant="caption" emphasis="low">
             {`Showing this page only: ${plural(comments.length, "comment", "comments")}`}
           </Text>

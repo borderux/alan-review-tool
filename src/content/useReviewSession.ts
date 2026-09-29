@@ -75,8 +75,9 @@ export function useReviewSession({
   }, [onSaveError]);
 
   // Every write goes through here, so a failure is reported the same way
-  // whichever key was written. Screenshots live in the session, and
-  // without the unlimitedStorage permission the quota is reachable.
+  // whichever key was written. The unlimitedStorage permission lifts the
+  // quota that screenshots would otherwise fill, but a write can still
+  // fail.
   const track = useCallback((write: Promise<void>) => {
     write.catch((err: unknown) => {
       console.error("Tagger: could not save.", err);

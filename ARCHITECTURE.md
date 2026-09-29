@@ -54,9 +54,19 @@ Recursica design system and bundled by Vite into one content script;
 
 ## Injection & lifecycle
 
-Permissions are deliberately minimal: `activeTab` + `scripting` + `storage`,
-no blanket `host_permissions`. `content.js` only ever runs because the user
-clicked the toolbar icon, which is what makes `activeTab` sufficient.
+Permissions are deliberately minimal: `activeTab`, `scripting`, `storage`
+and `unlimitedStorage`, with no blanket `host_permissions`. `content.js` only ever
+runs because the user clicked the toolbar icon, which is what makes
+`activeTab` sufficient. `unlimitedStorage` lifts the 10 MB
+`chrome.storage.local` quota: screenshots and captured element HTML live in
+the session, and a long review would otherwise fill it.
+
+The Firefox add-on id is `tagger@borderux.com`. It was
+`alan-review-tool@borderux.com` before the rename; Firefox keys an add-on's
+storage by that id, so the new id installs as a new add-on and existing
+Firefox users start with no stored data (an accepted consequence of the
+rename). The storage-key migration still matters on Chrome, where the
+extension's id does not change and old-key data carries over.
 
 Each click re-injects `content.js` from scratch. `main.tsx` starts by
 checking for an existing panel host (`#tagger-host`):
@@ -73,6 +83,14 @@ Anything that must survive a close/reopen lives outside the script:
 `chrome.storage.local` for session data, panel width and reviewer identity;
 `data-*` attributes on `document.documentElement` for the page's own
 pre-panel inline styles and the fonts-registered flag.
+
+Both capture modes mark themselves with a 2px dashed frame around the whole
+viewport (`lib/captureFrame.ts`): a black line under white dashes, so it
+shows on light and dark pages, fixed inside the viewport, ignoring the
+pointer and never affecting layout. There is no tint over the page, and the
+region-selection rectangle is an edge with no fill, so what is being
+captured stays fully visible. The frame and every other overlay element are
+removed before pixels are taken.
 
 Element picking (`lib/element.ts`) is a second hand-built overlay in the
 host page, under the same conditions: the mouse highlights the element
@@ -228,8 +246,8 @@ capture, a start over) save at once; typing saves after a 400 ms pause,
 and anything still pending is written when the panel closes. Saving is
 silent - the panel shows no save status, an approved exception to the
 autosave-status rule - but every write's promise is tracked, and a failed
-write (the storage quota is reachable, since screenshots live in the
-session) raises a toast with the browser's reason. Deleting a comment, a
+write (rarer now that `unlimitedStorage` lifts the quota, but a write can
+still fail) raises a toast with the browser's reason. Deleting a comment, a
 screenshot, or the whole session asks for confirmation first, in a modal
 on layer 1.
 

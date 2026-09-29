@@ -165,7 +165,8 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 1px solid #767676;
+  border: var(--recursica_brand_layer_1_properties_border-size, 1px) solid
+    var(--recursica_brand_layer_1_properties_border-color);
   vertical-align: middle;
   margin-right: var(--recursica_brand_dimensions_general_sm);
 }

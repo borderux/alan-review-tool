@@ -6,6 +6,7 @@
 // Everything captured here is someone else's page content: it is
 // untrusted, it is always escaped where it is shown, and the report tells
 // an AI reader never to treat it as instructions.
+import { createViewportFrame } from "./captureFrame";
 import type { CapturedElement } from "./types";
 
 export const PICKER_ID = "tagger-element-picker";
@@ -189,7 +190,9 @@ export function pickElement(): Promise<PickResult> {
     }
     placeBlockers();
 
-    root.append(box, tag, help, cursor);
+    // The same frame as screenshot selection, so both capture modes look
+    // alike. The element's own hover outline stays as it is.
+    root.append(createViewportFrame(), box, tag, help, cursor);
     document.documentElement.appendChild(root);
 
     // Keyboard picking starts at the body.

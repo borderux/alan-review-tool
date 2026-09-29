@@ -156,11 +156,24 @@ export function AnnotationEditor({
       returnFocus={false}
       closeButtonProps={{ "aria-label": "Close screenshot without saving" }}
     >
-      <Group align="flex-start" gap="rec-lg" wrap="wrap">
+      <Stack gap="rec-default">
         <Stack gap="rec-sm">
           {/* The reason Save annotations and Clear annotations start
               disabled, in text. */}
-          <Text>Drag on the screenshot to draw</Text>
+          {/* Clear annotations sits with the drawing it clears, not in the
+              footer, so the footer's three actions fit a narrow window. */}
+          <Group justify="space-between" gap="rec-sm" wrap="wrap">
+            <Text>Drag on the screenshot to draw</Text>
+            <Button
+              variant="text"
+              size="small"
+              // Always enabled: disabling itself on click would drop keyboard
+              // focus. With nothing drawn it simply does nothing.
+              onClick={clearDrawing}
+            >
+              Clear annotations
+            </Button>
+          </Group>
           <div className="art-shot">
             <img
               ref={imgRef}
@@ -171,7 +184,8 @@ export function AnnotationEditor({
             <canvas ref={outlineRef} aria-hidden />
             <canvas
               ref={strokeRef}
-              aria-label="Drawing area. Drag to draw on the screenshot."
+              role="img"
+              aria-label={`Drawing layer on the screenshot for ${id}`}
               onPointerDown={onPointerDown}
               onPointerMove={onPointerMove}
               onPointerUp={stopDrawing}
@@ -179,46 +193,50 @@ export function AnnotationEditor({
             />
           </div>
         </Stack>
-        {/* A choice of one from six: a radio group, stacked vertically. */}
+        {/* A choice of one from six: a radio group laid out as a row under
+            the image (an approved exception to the vertical-radio rule).
+            Still one radio group - one tab stop, arrow keys move and
+            select - and the selected state is the radio's own dot and
+            checked state, never the swatch colour alone. The row wraps
+            when the modal is narrow. */}
         <RadioGroup
           label="Pen color"
           formLayout="stacked"
           value={penColor}
           onChange={(value) => onPenColorChange(value as PenColor)}
         >
-          {PEN_COLORS.map((color) => (
-            <Radio
-              key={color}
-              value={color}
-              // Initial focus: the first field in the editor, on the
-              // current choice.
-              {...(color === penColor ? { "data-autofocus": true } : {})}
-              label={
-                <>
-                  <span
-                    className="art-swatch"
-                    // The one inline colour: the pen colour itself, which
-                    // is baked into screenshots and cannot be a theme token.
-                    style={{ backgroundColor: PEN[color].stroke }}
-                    aria-hidden
-                  />
-                  {PEN[color].name}
-                </>
-              }
-            />
-          ))}
+          <Group gap="rec-default" wrap="wrap">
+            {PEN_COLORS.map((color) => (
+              <Radio
+                key={color}
+                value={color}
+                // Initial focus: the first field in the editor, on the
+                // current choice.
+                {...(color === penColor ? { "data-autofocus": true } : {})}
+                label={
+                  <>
+                    <span
+                      className="art-swatch"
+                      // The one inline colour: the pen colour itself, which
+                      // is baked into screenshots and cannot be a theme token.
+                      style={{ backgroundColor: PEN[color].stroke }}
+                      aria-hidden
+                    />
+                    {PEN[color].name}
+                  </>
+                }
+              />
+            ))}
+          </Group>
         </RadioGroup>
-      </Group>
+      </Stack>
       {/* Every button is a direct child of the footer, so the modal's own
-          button gap applies throughout. The rarely used functions sit at the
-          bottom left, pushed apart from Cancel and Save by the flexible
-          spacer. */}
+          button gap applies throughout. The rarely used Delete screenshot
+          sits at the bottom left, pushed apart from Cancel and Save by the
+          flexible spacer. */}
       <Modal.Footer>
         <Button variant="text" onClick={onRequestDeleteScreenshot}>
           Delete screenshot
-        </Button>
-        <Button variant="text" disabled={!hasDrawing} onClick={clearDrawing}>
-          Clear annotations
         </Button>
         <Group flex={1} aria-hidden />
         <Button variant="outline" onClick={onCancel}>

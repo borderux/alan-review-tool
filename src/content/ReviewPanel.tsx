@@ -345,6 +345,7 @@ export function ReviewPanel({
 
   return (
     <div
+      className="art-panel"
       onKeyDown={onKeyDown}
       style={{ "--art-pinned-top": `${tabsBarHeight}px` } as CSSProperties}
     >
@@ -380,7 +381,6 @@ export function ReviewPanel({
         // The product name, in sentence case. The version lives at the
         // bottom of the Help tab.
         title="Tagger"
-        wrapHeaderText={false}
         closeButtonProps={{ "aria-label": "Close Tagger" }}
         onEnterTransitionEnd={() => newCommentRef.current?.focus()}
         onExitTransitionEnd={finishClose}
@@ -437,12 +437,12 @@ export function ReviewPanel({
             {/* Always present, so it never changes the footer's height: what
               the report and Start over act on, which is also why they are
               disabled when there is nothing yet. */}
-            <Stack maw={320}>
+            <Stack maw={300}>
               <Text variant="caption" emphasis="low">
                 {total === 0
                   ? session
                     ? "Report: no comments yet"
-                    : "No session yet: add a comment to start one"
+                    : "Add a comment to start a session"
                   : `Report and Start over: ${plural(total, "comment", "comments")} across ${plural(pageCount, "page", "pages")}`}
               </Text>
             </Stack>

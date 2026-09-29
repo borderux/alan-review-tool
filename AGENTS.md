@@ -36,6 +36,12 @@ assume none of that is obvious from a local diff alone.
   differ in their `background` block (`service_worker` vs `scripts`) and
   Firefox's own `browser_specific_settings` - everything else, including
   permissions and `web_accessible_resources`, should stay identical
+- Keep permissions minimal: `activeTab`, `scripting`, `storage` and
+  `unlimitedStorage`, with no `host_permissions`. `unlimitedStorage` is
+  there because screenshots and captured element HTML live in the session,
+  and without it a long review hits the 10 MB `chrome.storage.local` quota
+  and every save fails. Don't add another permission without raising it as
+  its own decision
 - Any change to `session`'s stored shape (see ARCHITECTURE.md's Data model
   section) needs a migration for data already sitting in a real user's
   `chrome.storage.local` from before the change - there is no

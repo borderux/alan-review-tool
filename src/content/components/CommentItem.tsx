@@ -197,7 +197,7 @@ export function CommentItem({
               {(comment.element.htmlTruncated ||
                 comment.element.stylesTruncated ||
                 comment.element.screenshotClipped) && (
-                <Stack maw={320}>
+                <Stack maw={300}>
                   <Text variant="caption" emphasis="low">
                     {[
                       comment.element.htmlTruncated &&

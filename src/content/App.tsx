@@ -67,14 +67,10 @@ export function App({
       {/* Layer 0, declared once, on the panel's root. The adapter's
           RecursicaThemeProvider is not used - see mount.tsx. */}
       <Layer layer={0}>
-        <ModalPortalContext.Provider value={modalPortalEl}>
-          <ReviewPanel
-            host={host}
-            portalEl={portalEl}
-            stored={stored}
-            onClosed={onClosed}
-          />
-        </ModalPortalContext.Provider>
+        {/* The portals come first, so the toast's Dismiss button is a
+            predictable tab stop - before the panel's controls, not after
+            all of them. Everything in them is fixed-position, so their
+            place in the DOM doesn't affect layout. */}
         <div
           ref={(el) => {
             if (!el) return;
@@ -83,6 +79,14 @@ export function App({
               el.appendChild(modalPortalEl);
           }}
         />
+        <ModalPortalContext.Provider value={modalPortalEl}>
+          <ReviewPanel
+            host={host}
+            portalEl={portalEl}
+            stored={stored}
+            onClosed={onClosed}
+          />
+        </ModalPortalContext.Provider>
       </Layer>
     </MantineProvider>
   );

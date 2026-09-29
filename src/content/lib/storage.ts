@@ -40,8 +40,8 @@ export const DEFAULT_PEN_COLOR: PenColor = "red";
 
 // The panel's three tabs need about 330px before they wrap onto a second
 // row, and navigation must never wrap. The minimum was 240px before the
-// tabs existed; a stored width below the new minimum is clamped up. This
-// range is an interim choice awaiting the owner's decision.
+// tabs existed; a stored width below the new minimum is clamped up. The
+// owner approved this range (336-720, default 360) with the resize strip.
 export const DEFAULT_WIDTH = 360;
 export const MIN_WIDTH = 336;
 export const MAX_WIDTH = 720;
@@ -177,9 +177,9 @@ export async function loadStoredState(): Promise<StoredState> {
 // origin this extension runs on, which is what makes "any site, one
 // session" work at all.
 //
-// Writes return their promise so a failure can be reported: screenshots
-// live in the session, and without the unlimitedStorage permission the
-// storage quota is reachable.
+// Writes return their promise so a failure can be reported. The
+// unlimitedStorage permission lifts the quota that screenshots would
+// otherwise fill, but a write can still fail.
 export function saveSession(session: Session | null): Promise<void> {
   if (session)
     return chrome.storage.local.set({ [SESSION_STORAGE_KEY]: session });

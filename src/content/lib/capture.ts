@@ -5,6 +5,7 @@
 // is the one deliberately hand-built surface, approved as such.
 
 import { pickElement, serializeElement, visibleRect } from "./element";
+import { applyTwoToneEdge, createViewportFrame } from "./captureFrame";
 import { suspendPagePush } from "./page";
 import type { CapturedElement } from "./types";
 
@@ -36,7 +37,10 @@ export function selectRegion(): Promise<Rect | null> {
     overlay.style.height = "100vh";
     overlay.style.zIndex = "2147483647";
     overlay.style.cursor = "crosshair";
-    overlay.style.background = "rgba(0, 0, 0, 0.15)";
+    // No tint: the page stays fully visible. The frame around the
+    // viewport says capture mode is on instead.
+    overlay.style.background = "transparent";
+    overlay.appendChild(createViewportFrame());
     document.documentElement.appendChild(overlay);
 
     // What to do, announced: a live region inserted empty and filled a
@@ -62,8 +66,10 @@ export function selectRegion(): Promise<Rect | null> {
     const box = document.createElement("div");
     box.style.all = "initial";
     box.style.position = "fixed";
-    box.style.border = "2px dashed #4f9dff";
-    box.style.background = "rgba(79, 157, 255, 0.2)";
+    // An edge only, no fill, so the area being captured stays fully
+    // visible.
+    applyTwoToneEdge(box);
+    box.style.background = "transparent";
     box.style.display = "none";
     overlay.appendChild(box);
 

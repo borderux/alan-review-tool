@@ -90,6 +90,12 @@ If you're an AI agent making changes here, read [AGENTS.md](AGENTS.md) and
 
 ## Load in Firefox
 
+**Upgrading from the Alan Review Tool:** the Firefox add-on id changed to
+`tagger@borderux.com` with the rename, so Firefox installs Tagger as a new
+add-on and any comments stored by the old version are not carried over.
+Download a report from the old version first if you need them. Chrome is
+not affected: its stored data moves to Tagger automatically.
+
 1. `about:debugging#/runtime/this-firefox`
 2. "Load Temporary Add-on…" → select `dist/firefox/manifest.json`
 3. Visit any site, click the toolbar icon — same panel.
