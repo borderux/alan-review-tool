@@ -23,7 +23,7 @@ function zipBrowser(browser) {
     throw new Error(`${sourceDir} does not exist - run "npm run build" first`);
   }
 
-  const zipPath = path.join(OUT_DIR, `tagger-${browser}-v${version}.zip`);
+  const zipPath = path.join(OUT_DIR, `snippy-${browser}-v${version}.zip`);
 
   return new Promise((resolve, reject) => {
     const output = fs.createWriteStream(zipPath);

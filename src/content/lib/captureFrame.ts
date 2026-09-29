@@ -9,7 +9,7 @@
 // viewport, sits inside it, ignores the pointer and never affects layout.
 // Like every overlay element, it is removed before any pixels are taken.
 
-export const FRAME_ATTR = "data-tagger-capture-frame";
+export const FRAME_ATTR = "data-snippy-capture-frame";
 
 // A two-tone dashed edge: a solid black border with white dashes drawn
 // over it. Also used for the region-selection rectangle.

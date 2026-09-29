@@ -26,7 +26,7 @@ const PANEL_ROOT_CLASS = "art-root";
 // from the host page's real root font size at mount (see theme.ts).
 function shadowScope(): AcceptedPlugin {
   return {
-    postcssPlugin: "tagger-shadow-scope",
+    postcssPlugin: "snippy-shadow-scope",
     Rule(rule: Rule) {
       if (rule.selector.includes(":root")) {
         rule.selector = rule.selector.replace(
@@ -56,7 +56,7 @@ const themeCssPath = path.join(
 
 function versionDefine(): VitePlugin {
   return {
-    name: "tagger-version",
+    name: "snippy-version",
     config: () => ({ define: { __APP_VERSION__: JSON.stringify(version) } }),
   };
 }
@@ -82,7 +82,7 @@ export default defineConfig({
     lib: {
       entry: path.join(rootDir, "src/content/main.tsx"),
       formats: ["iife"],
-      name: "Tagger",
+      name: "Snippy",
       fileName: () => "content.js",
     },
     // Fonts and other assets are inlined into content.js rather than

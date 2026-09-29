@@ -80,7 +80,7 @@ export function useReviewSession({
   // fail.
   const track = useCallback((write: Promise<void>) => {
     write.catch((err: unknown) => {
-      console.error("Tagger: could not save.", err);
+      console.error("Snippy: could not save.", err);
       onSaveErrorRef.current(String(err instanceof Error ? err.message : err));
     });
   }, []);

@@ -1,4 +1,4 @@
-# Tagger
+# Snippy
 
 > A Manifest V3 browser extension (Chrome and Firefox) for capturing UI/UX
 > feedback on any website - text comments and screenshots, organized into a
@@ -35,8 +35,10 @@ TypeScript on the Recursica design system, bundled by Vite.
   explaining the report's structure, also inlined at build time.
 - `vite.config.mts` - Bundles the panel into one classic-script
   `content.js`, and scopes every stylesheet to the panel's shadow root.
+- `scripts/make-icons.mjs` - Generates the four icon sizes in
+  `src/icons/` from one source PNG (`npm run icons -- <source.png>`).
 - `build.js` - Runs the Vite build, then copies `content.js`,
-  `background.js` into `dist/chrome` and `dist/firefox`,
+  `background.js` and the icons into `dist/chrome` and `dist/firefox`,
   pairing each with its own manifest.
 - `tsconfig.json`, `tsconfig.node.json` - Type checking for the panel and
   for the Vite config.

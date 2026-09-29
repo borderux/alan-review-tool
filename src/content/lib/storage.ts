@@ -6,25 +6,28 @@ import type {
   Session,
 } from "./types";
 
-export const WIDTH_STORAGE_KEY = "taggerPanelWidth";
-export const SESSION_STORAGE_KEY = "taggerSession";
-export const USER_STORAGE_KEY = "taggerUser";
-export const EMAIL_STORAGE_KEY = "taggerEmail";
+export const WIDTH_STORAGE_KEY = "snippyPanelWidth";
+export const SESSION_STORAGE_KEY = "snippySession";
+export const USER_STORAGE_KEY = "snippyUser";
+export const EMAIL_STORAGE_KEY = "snippyEmail";
 // The annotation pen's last colour: a preference, like the width, so it is
 // never cleared by Start over.
-export const PEN_COLOR_STORAGE_KEY = "taggerPenColor";
+export const PEN_COLOR_STORAGE_KEY = "snippyPenColor";
 // The unsent text in the New comment field. Kept so closing the panel
 // never throws it away; cleared once the comment is added.
-export const DRAFT_STORAGE_KEY = "taggerDraft";
+export const DRAFT_STORAGE_KEY = "snippyDraft";
 
-// Keys from before the rename to Tagger, mapped to their new names. Real
-// users' storage still holds data under the old keys (see
-// migrateStorageKeys).
-const LEGACY_KEYS: Record<string, string> = {
-  alanReviewToolPanelWidth: WIDTH_STORAGE_KEY,
-  alanReviewToolSession: SESSION_STORAGE_KEY,
-  alanReviewToolUser: USER_STORAGE_KEY,
-  alanReviewToolEmail: EMAIL_STORAGE_KEY,
+// The same values under the names of earlier generations of the product,
+// newest first: Tagger (a working name, only ever on the development
+// branch), then the original Alan Review Tool. Real users' storage still
+// holds data under the old keys (see migrateStorageKeys).
+const LEGACY_KEYS: Record<string, string[]> = {
+  [WIDTH_STORAGE_KEY]: ["taggerPanelWidth", "alanReviewToolPanelWidth"],
+  [SESSION_STORAGE_KEY]: ["taggerSession", "alanReviewToolSession"],
+  [USER_STORAGE_KEY]: ["taggerUser", "alanReviewToolUser"],
+  [EMAIL_STORAGE_KEY]: ["taggerEmail", "alanReviewToolEmail"],
+  [PEN_COLOR_STORAGE_KEY]: ["taggerPenColor"],
+  [DRAFT_STORAGE_KEY]: ["taggerDraft"],
 };
 
 export const PEN_COLORS = [
@@ -58,26 +61,27 @@ export interface StoredState {
   draft: string;
 }
 
-// The storage keys were renamed with the product (alanReviewTool* to
-// tagger*). For each old key: if it exists and its new key does not, copy
-// the value across, then delete the old key. A new key that already exists
-// always wins, so running this twice, or after the user has already used
-// the new version, never overwrites newer data. Runs before anything reads
-// storage; the session value it copies still goes through migrateSession.
+// The storage keys were renamed with the product, twice: alanReviewTool*
+// to tagger* to snippy*. For each current key that is missing, the value is
+// taken from the newest older generation that has it - the Tagger key, else
+// the Alan key. Then every older key is deleted. A current key that already
+// exists always wins, so running this twice, or after the user has already
+// used this version, never overwrites newer data. Runs before anything
+// reads storage; a copied session still goes through migrateSession, so an
+// old array-shaped session is normalized as well.
 export async function migrateStorageKeys(): Promise<void> {
-  const oldKeys = Object.keys(LEGACY_KEYS);
+  const olderKeys = Object.values(LEGACY_KEYS).flat();
   const stored = await chrome.storage.local.get([
-    ...oldKeys,
-    ...Object.values(LEGACY_KEYS),
+    ...Object.keys(LEGACY_KEYS),
+    ...olderKeys,
   ]);
   const copies: Record<string, unknown> = {};
-  const toRemove: string[] = [];
-  for (const oldKey of oldKeys) {
-    if (!(oldKey in stored)) continue;
-    const newKey = LEGACY_KEYS[oldKey];
-    if (!(newKey in stored)) copies[newKey] = stored[oldKey];
-    toRemove.push(oldKey);
+  for (const [key, older] of Object.entries(LEGACY_KEYS)) {
+    if (key in stored) continue;
+    const source = older.find((oldKey) => oldKey in stored);
+    if (source) copies[key] = stored[source];
   }
+  const toRemove = olderKeys.filter((oldKey) => oldKey in stored);
   if (Object.keys(copies).length > 0) await chrome.storage.local.set(copies);
   if (toRemove.length > 0) await chrome.storage.local.remove(toRemove);
 }

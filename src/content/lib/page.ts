@@ -4,21 +4,26 @@
 // styles live on the DOM (dataset), not in a closure.
 const html = document.documentElement;
 
-export const HOST_ID = "tagger-host";
-// The host id before the rename to Tagger. A panel opened by the old
-// version can still be on the page when the extension updates.
-export const LEGACY_HOST_ID = "alan-review-tool-host";
+export const HOST_ID = "snippy-host";
+// Host ids of earlier generations (Tagger, then the Alan Review Tool),
+// each with the dataset prefix it used for the page push. A panel opened
+// by an older version can still be on the page when the extension
+// updates.
+export const LEGACY_HOSTS = [
+  { id: "tagger-host", prefix: "tagger" },
+  { id: "alan-review-tool-host", prefix: "alanReviewTool" },
+];
 // Dispatched on the existing host by the next toolbar click, so the
 // instance that owns the panel can close it cleanly (see main.tsx).
-export const CLOSE_EVENT = "tagger:close";
+export const CLOSE_EVENT = "snippy:close";
 
 export function currentPageKey(): string {
   return location.origin + location.pathname + location.search;
 }
 
 export function pushPage(width: number): void {
-  html.dataset.taggerPrevWidth = html.style.width;
-  html.dataset.taggerPrevTransition = html.style.transition;
+  html.dataset.snippyPrevWidth = html.style.width;
+  html.dataset.snippyPrevTransition = html.style.transition;
   html.style.transition = "width 0.2s ease-out";
   html.style.width = `calc(100% - ${width}px)`;
 }
@@ -37,7 +42,7 @@ export function setPageWidth(width: number, animate: boolean): void {
 export function suspendPagePush(): () => void {
   const pushedWidth = html.style.width;
   html.style.transition = "";
-  html.style.width = html.dataset.taggerPrevWidth || "";
+  html.style.width = html.dataset.snippyPrevWidth || "";
   return () => {
     html.style.transition = "";
     html.style.width = pushedWidth;
@@ -50,20 +55,22 @@ export function setHostWidth(host: HTMLElement, width: number): void {
   host.style.width = `${width}px`;
 }
 
-// Undoes an old-version panel's page push, which used the pre-rename
-// dataset names.
-export function restoreLegacyPage(): void {
-  html.style.width = html.dataset.alanReviewToolPrevWidth || "";
-  html.style.transition = html.dataset.alanReviewToolPrevTransition || "";
-  delete html.dataset.alanReviewToolPrevWidth;
-  delete html.dataset.alanReviewToolPrevTransition;
+// Undoes an older version's page push, which used that version's dataset
+// names (for example alanReviewToolPrevWidth).
+export function restoreLegacyPage(prefix: string): void {
+  const widthKey = `${prefix}PrevWidth`;
+  const transitionKey = `${prefix}PrevTransition`;
+  html.style.width = html.dataset[widthKey] || "";
+  html.style.transition = html.dataset[transitionKey] || "";
+  delete html.dataset[widthKey];
+  delete html.dataset[transitionKey];
 }
 
 export function restorePage(): void {
-  html.style.width = html.dataset.taggerPrevWidth || "";
-  html.style.transition = html.dataset.taggerPrevTransition || "";
-  delete html.dataset.taggerPrevWidth;
-  delete html.dataset.taggerPrevTransition;
+  html.style.width = html.dataset.snippyPrevWidth || "";
+  html.style.transition = html.dataset.snippyPrevTransition || "";
+  delete html.dataset.snippyPrevWidth;
+  delete html.dataset.snippyPrevTransition;
 }
 
 // Makes everything behind an open modal inert, and returns the function

@@ -380,8 +380,8 @@ export function ReviewPanel({
         returnFocus={false}
         // The product name, in sentence case. The version lives at the
         // bottom of the Help tab.
-        title="Tagger"
-        closeButtonProps={{ "aria-label": "Close Tagger" }}
+        title="Snippy"
+        closeButtonProps={{ "aria-label": "Close Snippy" }}
         onEnterTransitionEnd={() => newCommentRef.current?.focus()}
         onExitTransitionEnd={finishClose}
       >

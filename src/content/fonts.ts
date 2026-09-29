@@ -22,7 +22,7 @@ const FACES: { family: string; dataUrl: string; weight: string }[] = [
 // Faces added to document.fonts outlive this script instance, so the
 // flag lives on the DOM, not in a closure (a fresh injection runs on every
 // toolbar click).
-const REGISTERED_FLAG = "taggerFonts";
+const REGISTERED_FLAG = "snippyFonts";
 
 function dataUrlToBytes(dataUrl: string): Uint8Array<ArrayBuffer> {
   const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
@@ -45,7 +45,7 @@ export function registerFonts(): void {
       });
       document.fonts.add(face);
     } catch (err) {
-      console.error(`Tagger: could not load ${family}.`, err);
+      console.error(`Snippy: could not load ${family}.`, err);
     }
   }
   html.dataset[REGISTERED_FLAG] = "1";

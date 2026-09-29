@@ -1,4 +1,4 @@
-# Tagger
+# Snippy
 
 A Manifest V3 browser extension (Chrome and Firefox) for capturing UI/UX
 feedback on any website. Click the toolbar icon on any tab and a slide-out
@@ -21,7 +21,7 @@ JavaScript in what you export.
   screenshots. Save annotations bakes the drawing into the image.
 - **Element capture** — Add element lets you pick any element on the page,
   like the browser's element inspector (hover and click, or the arrow keys
-  and Enter). Tagger records its selector, HTML, key computed styles, the
+  and Enter). Snippy records its selector, HTML, key computed styles, the
   viewport size and a screenshot of just that element, with typed form
   values and script contents removed.
 - **Built on the Recursica design system** (React, TypeScript and the
@@ -61,6 +61,18 @@ Runs lint and the type check, bundles the panel with Vite into a single
 `background.scripts` — everything else (`background.js`, `content.js`) is
 shared, unmodified, between both.
 
+## Extension icon
+
+The toolbar and extension-page icon comes from one source image:
+
+    npm run icons -- path/to/source.png
+
+This writes `src/icons/icon-16.png`, `icon-32.png`, `icon-48.png` and
+`icon-128.png`; commit those four files. The script has no dependencies: use
+a square PNG of at least 128 px (8 or 16 bits per channel, not interlaced).
+Until the icon files exist, `npm run build` warns and builds without an
+icon.
+
 ## Development
 
     npm install
@@ -90,11 +102,12 @@ If you're an AI agent making changes here, read [AGENTS.md](AGENTS.md) and
 
 ## Load in Firefox
 
-**Upgrading from the Alan Review Tool:** the Firefox add-on id changed to
-`tagger@borderux.com` with the rename, so Firefox installs Tagger as a new
-add-on and any comments stored by the old version are not carried over.
-Download a report from the old version first if you need them. Chrome is
-not affected: its stored data moves to Tagger automatically.
+**Upgrading from the Alan Review Tool:** the Firefox add-on id changed from
+`alan-review-tool@borderux.com` to `snippy@borderux.com` with the rename, so
+Firefox installs Snippy as a new add-on and any comments stored by the old
+version are not carried over. Download a report from the old version first
+if you need them. Chrome is not affected: its stored data moves to Snippy
+automatically.
 
 1. `about:debugging#/runtime/this-firefox`
 2. "Load Temporary Add-on…" → select `dist/firefox/manifest.json`

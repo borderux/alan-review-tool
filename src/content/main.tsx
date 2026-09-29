@@ -4,19 +4,21 @@ import { mountPanel } from "./mount";
 import {
   CLOSE_EVENT,
   HOST_ID,
-  LEGACY_HOST_ID,
+  LEGACY_HOSTS,
   restoreLegacyPage,
   restorePage,
 } from "./lib/page";
 
 void (async () => {
-  // A panel left open by the version before the rename to Tagger: close it
-  // like its own second click would have, and stop there.
-  const legacy = document.getElementById(LEGACY_HOST_ID);
-  if (legacy) {
-    legacy.remove();
-    restoreLegacyPage();
-    return;
+  // A panel left open by an older version (Tagger, or the Alan Review
+  // Tool): close it like its own second click would have, and stop there.
+  for (const { id, prefix } of LEGACY_HOSTS) {
+    const legacy = document.getElementById(id);
+    if (legacy) {
+      legacy.remove();
+      restoreLegacyPage(prefix);
+      return;
+    }
   }
   const existing = document.getElementById(HOST_ID);
   if (existing) {

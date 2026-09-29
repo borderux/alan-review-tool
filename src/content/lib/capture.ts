@@ -9,7 +9,7 @@ import { applyTwoToneEdge, createViewportFrame } from "./captureFrame";
 import { suspendPagePush } from "./page";
 import type { CapturedElement } from "./types";
 
-export const OVERLAY_ID = "tagger-selection-overlay";
+export const OVERLAY_ID = "snippy-selection-overlay";
 
 function setPanelHidden(host: HTMLElement, hidden: boolean): void {
   host.style.visibility = hidden ? "hidden" : "visible";
@@ -177,7 +177,7 @@ async function sendCaptureRequest(
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       return (await chrome.runtime.sendMessage({
-        type: "tagger:capture",
+        type: "snippy:capture",
       })) as CaptureResponse | undefined;
     } catch (err) {
       if (attempt === attempts) throw err;
@@ -259,7 +259,7 @@ export async function captureRegion(
       return captureAndCrop(rect);
     });
   } catch (err) {
-    console.error("Tagger: screenshot capture failed.", err);
+    console.error("Snippy: screenshot capture failed.", err);
     return { error: String(err) };
   }
 }
@@ -296,7 +296,7 @@ export async function captureElement(
       return { element, dataUrl: shot.dataUrl };
     });
   } catch (err) {
-    console.error("Tagger: element capture failed.", err);
+    console.error("Snippy: element capture failed.", err);
     return { error: String(err) };
   }
 }

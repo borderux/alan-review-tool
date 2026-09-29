@@ -2,7 +2,7 @@
 
 ## Overview
 
-Tagger is a Manifest V3 browser extension (Chrome and Firefox) that
+Snippy is a Manifest V3 browser extension (Chrome and Firefox) that
 lets a reviewer leave text comments and screenshots on any website, without
 that site needing to embed anything. Feedback is grouped into a single
 **session** spanning every page the reviewer visits, and exported as a
@@ -61,17 +61,18 @@ runs because the user clicked the toolbar icon, which is what makes
 `chrome.storage.local` quota: screenshots and captured element HTML live in
 the session, and a long review would otherwise fill it.
 
-The Firefox add-on id is `tagger@borderux.com`. It was
-`alan-review-tool@borderux.com` before the rename; Firefox keys an add-on's
-storage by that id, so the new id installs as a new add-on and existing
-Firefox users start with no stored data (an accepted consequence of the
-rename). The storage-key migration still matters on Chrome, where the
-extension's id does not change and old-key data carries over.
+The Firefox add-on id is `snippy@borderux.com`. The shipped Alan Review
+Tool used `alan-review-tool@borderux.com`; Firefox keys an add-on's storage
+by that id, so Snippy installs as a new add-on and existing Firefox users
+start with no stored data (an accepted consequence of the rename). The
+interim name Tagger (`tagger@borderux.com`) never shipped. The storage-key
+migration still matters on Chrome, where the extension's id does not
+change and old-key data carries over.
 
 Each click re-injects `content.js` from scratch. `main.tsx` starts by
-checking for an existing panel host (`#tagger-host`):
+checking for an existing panel host (`#snippy-host`):
 
-- **Found → close.** It dispatches a cancelable `tagger:close`
+- **Found → close.** It dispatches a cancelable `snippy:close`
   event on the host. The script instance that owns the panel listens for
   it, calls `preventDefault()`, saves anything still pending, slides the
   panel out, then unmounts React, removes the host and restores the page.
@@ -177,7 +178,7 @@ extension package on each click, never downloaded.
 ## Data model
 
 Everything lives under one `chrome.storage.local` key
-(`taggerSession`), not one entry per comment or per page - a content
+(`snippySession`), not one entry per comment or per page - a content
 script's own page-scoped `localStorage` is isolated per origin, which would
 defeat the entire "any site, one session" pitch.
 
@@ -201,11 +202,11 @@ session = {
 ```
 
 The types live in `src/content/lib/types.ts`. Reviewer identity
-(`taggerUser`, `taggerEmail`), the panel's width (`taggerPanelWidth`) and
-the annotation pen's last colour (`taggerPenColor`) are stored under
+(`snippyUser`, `snippyEmail`), the panel's width (`snippyPanelWidth`) and
+the annotation pen's last colour (`snippyPenColor`) are stored under
 **separate** keys and never cleared by "Start over" - they're
 identity/preference facts, not session data. The unsent text in the New
-comment field is kept under `taggerDraft`, so closing the panel never
+comment field is kept under `snippyDraft`, so closing the panel never
 loses it; adding the comment clears it.
 
 The page key is the address the panel is on right now. Single-page apps
@@ -232,14 +233,17 @@ HTML is capped at 50,000 characters and the styles at 8,000; anything cut
 is flagged, and the panel and the report say so. The field is optional, so
 older sessions load unchanged; `migrateSession()` drops a malformed one.
 
-**The storage keys were renamed** with the product, from `alanReviewTool*`
-to `tagger*`. `migrateStorageKeys()` runs before anything reads storage:
-for each old key that exists, it copies the value to the new key unless the
-new key already exists (the new key always wins), then deletes the old key.
-The copied session still goes through `migrateSession()` below, so an old
-array-shaped session is normalized as well. A panel left open by the old
-version (`#alan-review-tool-host`) is closed on the next click, restoring
-the page from the old dataset names.
+**The storage keys were renamed** with the product, twice: the shipped
+`alanReviewTool*` keys, then `tagger*` (an interim name used only on the
+development branch), now `snippy*`. `migrateStorageKeys()` runs before
+anything reads storage: for each `snippy*` key that is missing, it takes the
+value from the `tagger*` key, else from the `alanReviewTool*` key; then it
+deletes every older key. An existing `snippy*` key always wins, so running
+it twice never overwrites newer data. The copied session still goes through
+`migrateSession()` below, so an old array-shaped session is normalized as
+well. A panel left open by an older version (`#tagger-host` or
+`#alan-review-tool-host`) is closed on the next click, restoring the page
+from that version's dataset names.
 
 Saving: structural changes (a new, deleted or duplicated comment, a
 capture, a start over) save at once; typing saves after a 400 ms pause,
@@ -293,7 +297,7 @@ collision:
 - **`session.guid`** - one per session, generated with `crypto.randomUUID()`
   (falling back to `crypto.getRandomValues()` on plain `http://` pages,
   where `randomUUID()` isn't available). Written into the report as a hidden
-  `<meta name="tagger-session-id">` - parsable, never rendered.
+  `<meta name="snippy-session-id">` - parsable, never rendered.
 - **`CM-<n>`** - one per comment, unique _within_ a session. Combine the two
   for a globally unique id.
 
@@ -323,9 +327,16 @@ instructions.
    font files inlined as data. The version shown in the panel comes from
    `package.json` via a Vite `define`. A missing source file fails the
    build.
-2. Copies `content.js` and `background.js` into
+2. Copies `content.js`, `background.js` and the extension icon
+   (`src/icons/icon-{16,32,48,128}.png`) into
    `dist/chrome` and `dist/firefox`, with each browser's own manifest as
-   `manifest.json`.
+   `manifest.json`. Both manifests list the icon (`icons` and
+   `action.default_icon`); if the icon files haven't been generated yet,
+   the build prints a warning and removes those entries from the built
+   manifests, since a browser refuses a manifest that points at missing
+   files. `npm run icons -- <source.png>` (`scripts/make-icons.mjs`)
+   generates the four sizes from one PNG, with no dependencies beyond
+   Node's built-in `zlib`.
 
 Type checking is `npm run typecheck`: `tsconfig.json` covers the panel,
 `tsconfig.node.json` covers `vite.config.mts`.

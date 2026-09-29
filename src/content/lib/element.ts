@@ -9,7 +9,7 @@
 import { createViewportFrame } from "./captureFrame";
 import type { CapturedElement } from "./types";
 
-export const PICKER_ID = "tagger-element-picker";
+export const PICKER_ID = "snippy-element-picker";
 
 // Size caps, so one huge element can't fill the storage quota. Anything cut
 // is flagged, and the panel and the report both say so.
@@ -121,7 +121,7 @@ export function pickElement(): Promise<PickResult> {
     root.style.all = "initial";
 
     const box = document.createElement("div");
-    box.dataset.taggerPicker = "outline";
+    box.dataset.snippyPicker = "outline";
     box.style.all = "initial";
     box.style.position = "fixed";
     box.style.zIndex = "2147483647";
@@ -131,7 +131,7 @@ export function pickElement(): Promise<PickResult> {
     box.style.display = "none";
 
     const tag = document.createElement("div");
-    tag.dataset.taggerPicker = "label";
+    tag.dataset.snippyPicker = "label";
     tag.style.all = "initial";
     tag.style.position = "fixed";
     tag.style.zIndex = "2147483647";

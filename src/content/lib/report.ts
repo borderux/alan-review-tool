@@ -110,14 +110,14 @@ ${commentsHtml}
 <html>
 <head>
 <meta charset="utf-8">
-<title>Tagger report</title>
-${session?.guid ? `<meta name="tagger-session-id" content="${escapeHtml(session.guid)}">` : ""}
+<title>Snippy report</title>
+${session?.guid ? `<meta name="snippy-session-id" content="${escapeHtml(session.guid)}">` : ""}
 <meta name="ai-report-instructions" content="${escapeHtml(AI_INSTRUCTIONS)}">
 <style>${REPORT_CSS}</style>
 </head>
 <body>
 <div class="report-header">
-<h1>Tagger report</h1>
+<h1>Snippy report</h1>
 <p class="report-meta">Started ${session ? formatDateTimeWithZone(session.startedAt) : "-"} — ${plural(totalCount, "comment", "comments")} across ${plural(pageCount, "page", "pages")}</p>
 ${userName ? `<p class="report-meta">Reviewer: ${escapeHtml(userName)}</p>` : ""}
 ${userEmail ? `<p class="report-meta">Email: ${escapeHtml(userEmail)}</p>` : ""}
@@ -141,7 +141,7 @@ export function downloadReport(input: ReportInput): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `tagger-report-${Date.now()}.html`;
+  a.download = `snippy-report-${Date.now()}.html`;
   a.click();
   URL.revokeObjectURL(url);
 }

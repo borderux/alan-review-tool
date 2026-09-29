@@ -7,7 +7,7 @@ export function HelpTab() {
     // about 95 characters. 560px holds it near 70, inside the readable
     // range.
     <Stack gap="rec-default" mt="rec-default" maw={560}>
-      <Heading order={3}>How to use Tagger</Heading>
+      <Heading order={3}>How to use Snippy</Heading>
       <Stack component="ul" className="art-bullets" gap="rec-sm">
         <Text component="li">
           Type in New comment and press Enter to add it. Each comment gets a
