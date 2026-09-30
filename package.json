@@ -6,10 +6,10 @@
   "homepage": "https://recursica.com",
   "repository": {
     "type": "git",
-    "url": "https://github.com/borderux/snippy.git"
+    "url": "https://github.com/borderux/recursica-snippy.git"
   },
   "bugs": {
-    "url": "https://github.com/borderux/snippy/issues"
+    "url": "https://github.com/borderux/recursica-snippy/issues"
   },
   "author": "Recursica",
   "scripts": {
