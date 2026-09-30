@@ -63,7 +63,7 @@ export function CommentList({
   onAnnotate,
 }: CommentListProps) {
   const list = (group: PageGroup, label: string) => (
-    <Stack component="ol" className="art-list" aria-label={label} gap="rec-lg">
+    <Stack component="ol" className="art-list" aria-label={label} gap="rec-sm">
       {group.comments.map((comment) => (
         <CommentItem
           key={comment.id}
@@ -92,16 +92,7 @@ export function CommentList({
   const visible = groups.filter((g) => g.comments.length > 0);
   if (visible.length === 0) return null;
 
-  // The list ends with space of its own (a spacing token, as its bottom
-  // margin), so when scrolled to the end the last card clears the pinned
-  // footer: the panel body's own bottom padding sits below the footer,
-  // not above it.
-  if (!grouped)
-    return (
-      <Stack gap="rec-none" mb="rec-lg">
-        {list(visible[0], "Comments on this page")}
-      </Stack>
-    );
+  if (!grouped) return list(visible[0], "Comments on this page");
 
   // Each page heading is a link to that page, with a real href, in the
   // same tab: the link rules forbid opening a new tab automatically, and
@@ -112,7 +103,7 @@ export function CommentList({
   const sharedTitle = (g: PageGroup) =>
     visible.filter((o) => titleOf(o) === titleOf(g)).length > 1;
   return (
-    <Stack gap="rec-xl" mb="rec-lg">
+    <Stack gap="rec-xl">
       {visible.map((group) => {
         const href = pageHref(group.pageKey);
         return (

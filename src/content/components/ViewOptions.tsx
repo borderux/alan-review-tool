@@ -10,8 +10,8 @@ interface ViewOptionsProps {
 const PAGE_ONLY = "page-only";
 const SHOW_IMAGES = "show-images";
 
-// The two view preferences, as a checkbox group in the panel's pinned
-// footer, above its buttons: "Only view comments for this url" (checked:
+// The two view preferences, as a checkbox group at the very end of the
+// scrolling list, after the last comment card: "Only view comments for this url" (checked:
 // the current page's comments; unchecked: every page's, grouped by page)
 // and "Show screenshot thumbnails" (unchecked hides screenshots in the
 // panel only, never in the report). Each is saved the moment it changes,

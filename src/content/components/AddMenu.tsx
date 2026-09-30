@@ -1,4 +1,4 @@
-import { Plus } from "@phosphor-icons/react";
+import { Plus, X } from "@phosphor-icons/react";
 import { Button, Menu, Tooltip } from "@recursica/adapter-mantine-v8";
 import { useManagedMenu } from "./useManagedMenu";
 
@@ -36,7 +36,9 @@ export function AddMenu({
             ref={triggerRef}
             variant="outline"
             size="small"
-            icon={<Plus />}
+            // While the menu is open the icon is an X (owner decision); the
+            // name stays "Add" and aria-expanded carries the open state.
+            icon={opened ? <X /> : <Plus />}
             aria-label="Add"
             aria-describedby={describedBy}
             disabled={disabled}

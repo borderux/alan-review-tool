@@ -42,8 +42,8 @@ Recursica design system and bundled by Vite into one content script;
     comments, or every page's grouped under page headings, each heading a
     link to its page, in the same tab), the view
     options (`ViewOptions`: a checkbox group, "Only view comments for this
-    url" and "Show screenshot thumbnails", in the pinned footer above its
-    buttons), the Add menu (`AddMenu`: a small icon-only plus button in
+    url" and "Show screenshot thumbnails", at the very end of the
+    scrolling list, after the last card), the Add menu (`AddMenu`: a small icon-only plus button in
     the panel header, left of the title, rendered into a slot placed first
     in the header - Comment, Screenshot, Element; the menu is
     rendered into slots placed in the header, see Adapter workarounds), a
@@ -236,12 +236,14 @@ Kept, our own elements that no component covers (tokens only, owner-requested):
 
 - `panel.css` `.art-shot-frame` (the bordered frame around a comment's image; no image component), `.art-thumb` (image scales to the frame), `.art-shot-well` / `.art-shot-scroll` (the editor's bordered, scrolling image area), `.art-shot` canvases (drawing), `.art-swatch` (pen colours are baked into screenshots, so fixed), `.art-sr-only` (no visually-hidden utility), `.art-list` (reset for the list semantics a card set needs).
 
+Owner-approved exceptions, not adapter bugs (round 13):
+
+- `panel.css` token remap block on `.art-root` - owner-requested token remap. The panel body's content padding (`--recursica_ui-kit_components_panel_properties_content-horizontal-padding`, 24 px, and `...content-vertical-padding`, 16 px) and the card padding (`--recursica_ui-kit_components_card_properties_padding`, 24 px) are re-pointed to the brand's general small dimension (`--recursica_brand_dimensions_general_sm`, 4 px); the card radius for layer 0 (`--recursica_ui-kit_modes_light_layer_0_components_card_properties_borders_border-radius` and the `dark` twin, 24 px via the brand's layer-1 radius) is set to 12 px, which no theme radius token equals. No element is styled; only these token values change. Their proper home is the Forge theme's ui-kit values; remove the block once Forge carries them.
+- `panel.css` `text-box: trim-both cap alphabetic` on the panel title and the card number headings, inside `@supports (text-box-trim: trim-both)` - owner-suggested fix for the theme's heading line-box bug: the header type (Dongle at 56 px, 39.2 px line height) puts the glyphs off the centre of their line box. Trimmed, the title's cap height centres on Add and Close within 0.5 px (was 4.6 px high) and a card number on its buttons within 1 px (was 4.8 px). The header gets 4 px shorter (64 to 60 px) and the number row 1.6 px shorter; descenders still show. Firefox doesn't support it yet and shows the theme's own line box.
+
 Adapter gaps with no workaround (the UI shows the kit's real behaviour):
 
-- `Card` padding is a fixed 24 px (`--recursica_ui-kit_components_card_properties_padding`, `general_xl`); the card has no size or density option, and `padding` is stripped.
-- `Panel` body padding is a fixed 24 px left and right, 16 px top and bottom (`content-horizontal-padding`, `content-vertical-padding`); no prop changes it. With the card's 2 px border and 24 px padding, a comment's text box starts 51 px in from the panel edge.
-- The panel title's glyphs sit off the centre of their line box (the theme's header type: Dongle at 56 px with a 39.2 px line height), so the title can look off-centre beside the header's buttons, although every header item's box shares one centre line.
-
+- `Card` and `Panel` have no size or density option and strip padding props (now remapped at token level above, by owner request).
 - `Link` applies its own text style, so a page title that is a link inside a heading shows at the link's size, not the heading's.
 
 Removed in rounds 10 and 11 (the UI now shows the adapter's real behaviour):

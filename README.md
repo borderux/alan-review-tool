@@ -15,8 +15,8 @@ JavaScript in what you export.
 - **One Add menu** — the plus button in the panel header offers Comment,
   Screenshot or Element. Each creates a new numbered comment card at the
   top of the list, with focus in its text box.
-- **This page only, or every page** — two checkboxes above the footer
-  buttons. "Only view comments for this url" (checked by default) shows
+- **This page only, or every page** — two checkboxes at the end of the
+  comment list. "Only view comments for this url" (checked by default) shows
   just the current page's comments; unchecked, it shows every page's,
   grouped under page headings that link to each page. "Show screenshot
   thumbnails" (checked by

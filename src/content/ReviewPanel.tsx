@@ -462,34 +462,54 @@ export function ReviewPanel({
             turned off. Close Snippy and open it again to try again.
           </Text>
         ) : (
-          <CommentList
-            review={review}
-            grouped={!pageOnly}
-            groups={groups}
-            showImages={showImages}
-            formLayout={formLayout}
-            focusId={focusId}
-            onFocused={() => setFocusId(null)}
-            capturing={capturing}
-            captureTarget={captureTarget}
-            onAddScreenshotTo={handleAddScreenshotTo}
-            onDuplicate={handleDuplicate}
-            onRequestDelete={(commentPage, comment) =>
-              setConfirmation({
-                kind: "delete-comment",
-                pageKey: commentPage,
-                comment,
-              })
-            }
-            onAnnotate={(comment) =>
-              setAnnotating({
-                pageKey:
-                  groups.find((g) => g.comments.includes(comment))?.pageKey ??
-                  pageKey,
-                id: comment.id,
-              })
-            }
-          />
+          // The comment list, then the view options at the very end of the
+          // scrolling area, so they scroll with the comments. The whole
+          // block ends with space of its own (a spacing token, as its
+          // bottom margin), so at the end of the scroll it clears the
+          // pinned footer: the panel body's own bottom padding sits below
+          // the footer, not above it.
+          <Stack gap="rec-lg" mb="rec-lg">
+            <CommentList
+              review={review}
+              grouped={!pageOnly}
+              groups={groups}
+              showImages={showImages}
+              formLayout={formLayout}
+              focusId={focusId}
+              onFocused={() => setFocusId(null)}
+              capturing={capturing}
+              captureTarget={captureTarget}
+              onAddScreenshotTo={handleAddScreenshotTo}
+              onDuplicate={handleDuplicate}
+              onRequestDelete={(commentPage, comment) =>
+                setConfirmation({
+                  kind: "delete-comment",
+                  pageKey: commentPage,
+                  comment,
+                })
+              }
+              onAnnotate={(comment) =>
+                setAnnotating({
+                  pageKey:
+                    groups.find((g) => g.comments.includes(comment))?.pageKey ??
+                    pageKey,
+                  id: comment.id,
+                })
+              }
+            />
+            <ViewOptions
+              pageOnly={pageOnly}
+              showImages={showImages}
+              onPageOnlyChange={(next) => {
+                setPageOnly(next);
+                review.track(savePageOnly(next));
+              }}
+              onShowImagesChange={(next) => {
+                setShowImages(next);
+                review.track(saveShowImages(next));
+              }}
+            />
+          </Stack>
         )}
 
         {/*
@@ -498,57 +518,38 @@ export function ReviewPanel({
           as a toast.
         */}
         {/* Buttons only, no text (owner decision). */}
-        {/* The kit's footer is pinned to the bottom of the panel, so the
-            view options sit in it, directly above the buttons, and never
-            scroll with the list. */}
         <Panel.Footer>
-          <Stack gap="rec-md" w="100%">
-            {!loadFailed && (
-              <ViewOptions
-                pageOnly={pageOnly}
-                showImages={showImages}
-                onPageOnlyChange={(next) => {
-                  setPageOnly(next);
-                  review.track(savePageOnly(next));
-                }}
-                onShowImagesChange={(next) => {
-                  setShowImages(next);
-                  review.track(saveShowImages(next));
-                }}
-              />
-            )}
-            <Group justify="space-between" wrap="nowrap" gap="rec-sm" w="100%">
-              {/* The footer's two buttons are the default size; every other
+          <Group justify="space-between" wrap="nowrap" gap="rec-sm" w="100%">
+            {/* The footer's two buttons are the default size; every other
                 button in the panel is small (owner decision). */}
-              <Button
-                variant="text"
-                disabled={!session}
-                data-start-over="true"
-                onClick={() => setConfirmation({ kind: "start-over" })}
-              >
-                Start over
-              </Button>
-              {/* The count is every comment in the report, on every page -
+            <Button
+              variant="text"
+              disabled={!session}
+              data-start-over="true"
+              onClick={() => setConfirmation({ kind: "start-over" })}
+            >
+              Start over
+            </Button>
+            {/* The count is every comment in the report, on every page -
                 not only the ones showing. In parentheses after a label
                 that doesn't change, left out at zero; the accessible name
                 spells it out. */}
-              <Button
-                variant="solid"
-                disabled={total === 0}
-                data-download="true"
-                aria-label={
-                  total > 0
-                    ? `Download ${plural(total, "comment", "comments")}`
-                    : undefined
-                }
-                onClick={() => setDownloadOpen(true)}
-              >
-                {total > 0
-                  ? `Download comments (${formatCount(total)})`
-                  : "Download comments"}
-              </Button>
-            </Group>
-          </Stack>
+            <Button
+              variant="solid"
+              disabled={total === 0}
+              data-download="true"
+              aria-label={
+                total > 0
+                  ? `Download ${plural(total, "comment", "comments")}`
+                  : undefined
+              }
+              onClick={() => setDownloadOpen(true)}
+            >
+              {total > 0
+                ? `Download comments (${formatCount(total)})`
+                : "Download comments"}
+            </Button>
+          </Group>
         </Panel.Footer>
       </Panel>
 

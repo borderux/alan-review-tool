@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { FocusEvent, MutableRefObject } from "react";
-import { Camera, Copy, DotsThree, Trash } from "@phosphor-icons/react";
+import { Camera, Copy, DotsThree, Trash, X } from "@phosphor-icons/react";
 import {
   Button,
   Card,
@@ -122,11 +122,11 @@ export function CommentItem({
           content, rather than a Card.Header, whose own padding and divider
           make every card much taller. Then the Comment field, then the
           screenshot or element beneath it. The parts are spaced by the
-          theme's md gap (12px). The card's own padding is fixed by the kit
-          (no size or density option - a reported gap). */}
+          theme's general small dimension (rec-sm, 4px), and so is the
+          card's padding (owner-requested token remap in panel.css). */}
       <Card>
         <Card.Content>
-          <Stack gap="rec-md">
+          <Stack gap="rec-sm">
             <Group justify="space-between" wrap="nowrap" gap="rec-sm">
               <Heading
                 order={headingOrder}
@@ -158,7 +158,8 @@ export function CommentItem({
                       <Button
                         variant="outline"
                         size="small"
-                        icon={<DotsThree />}
+                        // An X while the menu is open (owner decision).
+                        icon={menuOpened ? <X /> : <DotsThree />}
                         ref={menuTriggerRef}
                         aria-label={`More actions for ${name}`}
                         data-row-menu={comment.id}
@@ -222,7 +223,7 @@ export function CommentItem({
               </div>
             )}
             {hasShot && !showImages && (
-              <Stack gap="rec-md" align="flex-start">
+              <Stack gap="rec-sm" align="flex-start">
                 {summary}
                 {annotate}
               </Stack>

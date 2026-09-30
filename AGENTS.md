@@ -23,7 +23,11 @@ assume none of that is obvious from a local diff alone.
   elements no component covers, and each one says why. The adapter's
   `overStyled` escape hatch is used exactly once (the panel's
   user-resizable width, an approved exception) - any new use needs a
-  stated reason and a reported design-system gap
+  stated reason and a reported design-system gap. One other exception is
+  approved: `panel.css` re-points a few ui-kit token values (panel body
+  padding, card padding, card radius) for the panel only, at the owner's
+  request, until the Forge theme carries them - add to that block only
+  with the owner's approval
 - **Don't paper over the adapter.** If a Recursica component misbehaves,
   that is an adapter bug: report it and let the UI show the real
   behaviour. A workaround is kept only when running in a shadow root

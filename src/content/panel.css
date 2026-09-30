@@ -13,6 +13,31 @@
   font-family: var(--recursica_brand_fonts_primary);
 }
 
+/* OWNER-APPROVED EXCEPTION: a token remap, not an override of any element.
+   The owner asked for tighter spacing than the kit's Panel and Card allow
+   (the adapter strips their padding props) and a 12px card radius, which
+   no theme radius token equals. So these few ui-kit token values are
+   re-pointed for the panel only, here, in one place. The proper home is
+   the Forge theme's ui-kit values; remove this block once Forge carries
+   them. See ARCHITECTURE.md, "Adapter workarounds".
+   - panel body padding (24px across, 16px down) -> general small (4px)
+   - card padding (24px) -> general small (4px)
+   - card corner radius, layer 0 light and dark (the brand's layer-1
+     radius, 24px) -> 12px */
+.art-root {
+  --recursica_ui-kit_components_panel_properties_content-horizontal-padding: var(
+    --recursica_brand_dimensions_general_sm
+  );
+  --recursica_ui-kit_components_panel_properties_content-vertical-padding: var(
+    --recursica_brand_dimensions_general_sm
+  );
+  --recursica_ui-kit_components_card_properties_padding: var(
+    --recursica_brand_dimensions_general_sm
+  );
+  --recursica_ui-kit_modes_light_layer_0_components_card_properties_borders_border-radius: 12px;
+  --recursica_ui-kit_modes_dark_layer_0_components_card_properties_borders_border-radius: 12px;
+}
+
 /* Approved exception: the user-resizable panel width. The kit's panel has
    no resize affordance, so this strip is hand-built. It is a real,
    focusable separator; arrow keys resize it as the non-drag alternative. */
@@ -64,7 +89,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--recursica_brand_dimensions_general_md);
+  gap: var(--recursica_brand_dimensions_general_sm);
   /* Exactly the width of the Comment text box beneath it, at every panel
      width: the full content width, up to the same token that caps the
      stacked text box (so on a wide panel both stop at that width). */
@@ -74,10 +99,12 @@
     --recursica_ui-kit_components_textarea_variants_layouts_stacked_properties_max-width
   );
   box-sizing: border-box;
-  /* The theme's smallest spacing, to keep the card compact. */
+  /* The theme's general small dimension (4px), like the card around it. */
   padding: var(--recursica_brand_dimensions_general_sm);
   border: var(--recursica_ui-kit_components_panel_properties_border-size) solid
     var(--recursica_ui-kit_components_panel_properties_colors_border-color);
+  /* Concentric with the card: the card's 12px radius minus the card's
+     4px padding is 8px, the brand's default radius. */
   border-radius: var(--recursica_brand_dimensions_border-radii_default);
 }
 /* The image scales to the frame's width, keeping its aspect ratio - never
@@ -175,4 +202,17 @@
   border: var(--recursica_brand_layer_1_properties_border-size) solid
     var(--recursica_brand_layer_1_properties_border-color);
   vertical-align: middle;
+}
+
+/* OWNER-SUGGESTED FIX for the theme's heading line-box bug: the panel title
+   and each card's number heading are trimmed to their cap height and
+   baseline, so their letters, not their line boxes, centre beside the
+   buttons in the same row. Only where the browser supports it (the value
+   is trim-both; there is no -webkit- alias); elsewhere (Firefox today) the
+   theme's own line box shows. See ARCHITECTURE.md, "Adapter workarounds". */
+@supports (text-box-trim: trim-both) {
+  .mantine-Drawer-title,
+  .art-row :is(h3, h4) {
+    text-box: trim-both cap alphabetic;
+  }
 }
