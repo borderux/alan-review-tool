@@ -43,6 +43,10 @@ export function commentHref(
   const id = element ? elementFragmentId(element) : null;
   if (!id) return href;
   const url = new URL(href);
+  // A page address that already has a fragment (a hash route such as
+  // #/orders/42) keeps it: replacing it with #id would open a different
+  // view. The link then goes to the page only.
+  if (url.hash) return href;
   url.hash = id;
   return url.href;
 }

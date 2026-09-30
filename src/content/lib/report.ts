@@ -79,17 +79,6 @@ function recursicaLine(d: RecursicaDetection | undefined): string {
   return `<p class="page-recursica" ${attrs}>Recursica: ${parts.join(", ")}</p>`;
 }
 
-// A comment link's visible text: the path (the site's root is "/") and
-// the fragment, without the origin or the query string.
-function shortLinkText(href: string): string {
-  try {
-    const url = new URL(href);
-    return `${url.pathname}${url.hash}`;
-  } catch {
-    return href;
-  }
-}
-
 export function totalCommentCount(session: Session | null): number {
   if (!session) return 0;
   return Object.values(session.pages).reduce(
@@ -121,10 +110,7 @@ export function buildReportHtml({
   const lightboxTargets: string[] = [];
 
   const tocHtml = pages
-    .map(
-      ([url], i) =>
-        `<li><a href="#page-${i}">${escapeHtml(url.split("?")[0])}</a></li>`,
-    )
+    .map(([url], i) => `<li><a href="#page-${i}">${escapeHtml(url)}</a></li>`)
     .join("\n");
 
   const pagesHtml = pages
@@ -135,15 +121,24 @@ export function buildReportHtml({
         .sort((a, b) => a.commentNumber - b.commentNumber)
         .map((comment) => {
           let shotsHtml = "";
-          // The lightbox target lives at the end of the document; :target
-          // matching doesn't care where in the DOM it sits.
-          if (comment.screenshot) {
+          // A thumbnail linked to its full-size lightbox. The lightbox
+          // target lives at the end of the document; :target matching
+          // doesn't care where in the DOM it sits.
+          const shot = (src: string, alt: string) => {
             const shotId = `shot-${shotIndex}`;
             shotIndex += 1;
-            shotsHtml = `<div class="comment-shots"><a href="#${shotId}" class="shot-thumb-link"><img class="shot-thumb" src="${comment.screenshot}" alt="Screenshot" /></a></div>`;
             lightboxTargets.push(
-              `<a href="#_" id="${shotId}" class="lightbox"><img src="${comment.screenshot}" alt="Screenshot" /></a>`,
+              `<a href="#_" id="${shotId}" class="lightbox"><img src="${src}" alt="${escapeHtml(alt)}" /></a>`,
             );
+            return `<a href="#${shotId}" class="shot-thumb-link"><img class="shot-thumb" src="${src}" alt="${escapeHtml(alt)}" /></a>`;
+          };
+          const marks = comment.annotations ?? [];
+          if (comment.screenshot && comment.screenshotClean && marks.length) {
+            // Annotated: both images, each labelled, the annotated first.
+            const dots = marks.filter((a) => a.kind === "dot").length;
+            shotsHtml = `<div class="comment-shots"><figure class="shot shot-annotated" data-annotation-count="${marks.length}" data-dot-count="${dots}">${shot(comment.screenshot, "Screenshot with annotations")}<figcaption>With annotations</figcaption></figure><figure class="shot shot-clean">${shot(comment.screenshotClean, "Screenshot, original, no annotations")}<figcaption>Original, no annotations</figcaption></figure></div>`;
+          } else if (comment.screenshot) {
+            shotsHtml = `<div class="comment-shots">${shot(comment.screenshot, "Screenshot")}</div>`;
           }
           // The comment number is its position, 1 to N across the session.
           // With the hidden session guid (in the head, once) it identifies
@@ -155,12 +150,11 @@ export function buildReportHtml({
             : "";
           // Every comment links back to its own page, so a comment read on
           // its own still says where it came from - an element comment to
-          // the element itself when it had a simple, unique id. The href
-          // keeps the full address; the visible text is short and muted -
-          // the page's path, plus the #id for an element - since the page
-          // heading above already shows the full address.
+          // the element itself when it had a simple, unique id. The visible
+          // text is the full address, query and fragment included, the
+          // same as the href (small and muted, by the number).
           const href = commentHref(url, comment.element);
-          const linkText = href ? shortLinkText(href) : "";
+          const linkText = href ?? "";
           const linkHtml = href
             ? `<p class="comment-link"><a href="${escapeHtml(href)}">${escapeHtml(linkText)}</a></p>`
             : "";
@@ -168,12 +162,11 @@ export function buildReportHtml({
         })
         .join("\n");
 
-      // url is the full page key (origin + pathname + search) - that's
-      // what the report links to, but the visible text drops the search
-      // params so the link doesn't read as a wall of query-string noise.
-      const urlWithoutSearch = url.split("?")[0];
+      // url is the full page key; the visible text is the same full
+      // address, query and fragment included (a page whose address is
+      // only a query or a hash route otherwise reads as just the domain).
       return `<div class="page-section" id="page-${i}">
-<h2 class="page-url"><a href="${escapeHtml(url)}">${escapeHtml(urlWithoutSearch)}</a></h2>
+<h2 class="page-url"><a href="${escapeHtml(url)}">${escapeHtml(url)}</a></h2>
 ${recursicaLine(page.recursica)}
 ${commentsHtml}
 </div>`;

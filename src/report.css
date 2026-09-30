@@ -112,6 +112,7 @@ h1 {
 }
 .comment-link a {
   color: #888;
+  overflow-wrap: anywhere;
   text-decoration: underline;
   text-decoration-color: #ccc;
   word-break: break-all;
@@ -133,6 +134,16 @@ h1 {
 /* Thumbnails keep the image's shape: at most 64px tall and the column's
    width, never cropped, so a wide strip or a tall crop still reads. The
    lightbox shows the full image. */
+/* An annotated screenshot shows two labelled figures side by side. */
+.shot {
+  margin: 0;
+  max-width: 100%;
+}
+.shot figcaption {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #666;
+}
 .shot-thumb-link {
   display: inline-block;
   max-width: 100%;

@@ -349,7 +349,15 @@ field, is deleted on load.
 The page key is the address the panel is on right now. Single-page apps
 change it without a reload, and a content script can't see the page's own
 history calls, so `usePageKey()` re-reads it on a short interval; comments
-added after an in-app navigation are filed under the new address.
+added after an in-app navigation are filed under the new address. The key
+is `origin + pathname + search`: **it leaves out the fragment**, so an app
+that routes by hash (`#/orders/42`, `#/orders/43`) files every route under
+one page. Changing that is a stored-shape decision (existing sessions keep
+their keys), so it is raised with the owner rather than made silently.
+
+An element comment's report link adds `#<id>` only when the page address
+has no fragment of its own; on a hash-route address it links to the page,
+keeping the route.
 
 **Annotations stay editable.** A comment with annotations stores three
 things (all optional, added in round 16): `screenshot` - the annotated image
@@ -450,8 +458,10 @@ rendered with React:
   wide element strips and tall crops stay recognisable.
 - **Table of contents** linking to each page section by anchor.
 - **One section per page**, in the order first touched, each with a link to
-  the page (visible text omits query params for readability; the `href`
-  always has the full URL).
+  the page. The visible text is the full URL, query and fragment included,
+  the same as the `href` - in the table of contents too (until round 16 the
+  visible text dropped the query, so a page whose address was only a query
+  read as just the domain).
 - **Comments** in ascending number order within each page (the panel
   stores and shows them newest first), each labelled "Comment <n>" with the
   plain number in `data-comment-id`. The number is the comment's position,
@@ -461,8 +471,8 @@ rendered with React:
   number becomes text, in the panel and the report alike. (Reports from
   before this wrote it as `CM-<n>`.)
 - **A link per comment**, in `p.comment-link`, back to the comment's own
-  page (full `href`; short, muted visible text: the page's path, plus the
-  `#id` for an element), so a comment
+  page (small and muted; its text and `href` are both the full URL), so a
+  comment
   read on its own still says where it came from. An element comment links
   to `#<id>` on that page only when its element had a simple, unique id at
   capture time: `elementFragmentId()` in `lib/links.ts` accepts only a
@@ -470,6 +480,11 @@ rendered with React:
   id unique in the document, never inside a shadow root) with a plain id
   that the captured HTML's own `id` matches. No fragment is ever made from
   class names or paths. Only http, https and file addresses become links.
+- **Annotated screenshots** show two labelled figures in `comment-shots`:
+  `figure.shot.shot-annotated` ("With annotations", with
+  `data-annotation-count` and `data-dot-count`) and `figure.shot.shot-clean`
+  ("Original, no annotations"), each with its own thumbnail and lightbox.
+  A screenshot without annotations shows one image, as before.
 - **Element comments** also show the captured element under a visible
   "Element" label (`p.element-label`): its selector and
   viewport, then its HTML and styles in collapsible `<details>` sections
