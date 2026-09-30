@@ -197,6 +197,35 @@ Because every stylesheet is inlined, `content.js` is large (about 2 MB,
 most of it the theme's CSS variables). It is read from the local
 extension package on each click, never downloaded.
 
+## Environment
+
+So a developer can reproduce what the reviewer saw, the report carries a
+few facts about the reviewer's browser and the page (`lib/environment.ts`),
+all optional fields, normalized field by field in `migrateSession()`:
+
+- **Session** (`session.environment`, set when the session starts and
+  refreshed with the browser's client hints when the panel opens, or at
+  download for older sessions): browser name and version, operating system
+  and (where the browser reports it) its version, the raw user agent string
+  (hidden metadata only), the browser's UI language, the IANA time zone and
+  the screen size. The light/dark and reduced-motion preferences are read
+  when the report is built.
+- **Comment** (`comment.context`, when the comment is made or its
+  screenshot or element captured): time, window viewport, device pixel
+  ratio (which includes browser zoom), visual-viewport scale (pinch zoom),
+  scroll position and document scroll height, the light/dark preference, a
+  theme attribute on the page's `<html>` or `<body>` if there is an obvious
+  one (`data-recursica-theme`, `data-theme`, `data-color-mode`,
+  `data-bs-theme`, `data-mantine-color-scheme`), and `<html lang>`. Element
+  comments keep their viewport here now; older ones keep
+  `element.viewport`.
+
+Deliberately not captured: IP address, cookies, any storage, the list of
+extensions, fonts or plugins, canvas or other fingerprints, and any other
+page content. The report shows the session facts in an "Environment" line
+and `snippy-*` meta tags, and each comment's in a muted line with
+`data-*` attributes.
+
 ## Keyboard shortcuts
 
 `lib/shortcuts.ts` holds them; `ReviewPanel.tsx` listens on `window` in the

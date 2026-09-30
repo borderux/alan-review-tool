@@ -23,6 +23,11 @@ import { ViewOptions } from "./components/ViewOptions";
 import { captureElement, captureRegion } from "./lib/capture";
 import { plural } from "./lib/format";
 import { commentName } from "./lib/ids";
+import {
+  commentContextNow,
+  sessionEnvironment,
+  sessionEnvironmentNow,
+} from "./lib/environment";
 import { detectRecursica } from "./lib/recursica";
 import { matchShortcut, type ShortcutId } from "./lib/shortcuts";
 import {
@@ -347,6 +352,7 @@ export function ReviewPanel({
         screenshotScale: result.scale,
         screenshotClean: undefined,
         annotations: undefined,
+        context: commentContextNow(),
       },
       "now",
     );
@@ -426,6 +432,22 @@ export function ReviewPanel({
     return () => window.removeEventListener("keydown", onKey, true);
   }, [shortcutsLive]);
 
+  // The reviewer's environment, with the full browser and OS versions the
+  // browser offers (asynchronously), recorded once a session exists.
+  const sessionGuid = session?.guid;
+  useEffect(() => {
+    if (!sessionGuid || loadFailed) return;
+    let cancelled = false;
+    void sessionEnvironment().then((env) => {
+      if (!cancelled) review.setEnvironment(env);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Once per session and panel open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionGuid, loadFailed]);
+
   // Download report: save what the reviewer entered (name and email under
   // their own keys, session details in the session, as before), then build
   // the report from exactly those values.
@@ -435,7 +457,14 @@ export function ReviewPanel({
     if (session && values.details !== session.details)
       review.setDetails(values.details);
     downloadReport({
-      session: session ? { ...session, details: values.details } : session,
+      // Sessions from before the environment existed get it now.
+      session: session
+        ? {
+            ...session,
+            details: values.details,
+            environment: session.environment ?? sessionEnvironmentNow(),
+          }
+        : session,
       userName: values.userName,
       userEmail: values.userEmail,
     });

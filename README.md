@@ -46,6 +46,11 @@ browser manifests and the panel, and fails if they would differ.
 - **Built on the Recursica design system** (React, TypeScript and the
   Recursica Mantine adapter, with the default Recursica Forge theme), in
   light or dark mode following your operating system.
+- **Environment in the report** — the reviewer's browser, OS, language,
+  time zone and screen, and for each comment the viewport, pixel ratio,
+  scroll position and light/dark setting at that moment, so a developer
+  can reproduce the layout. Nothing else is collected (see ARCHITECTURE.md,
+  "Environment").
 - **Keyboard shortcuts** while the panel is open, shown after each label:
   add a comment, screenshot or element, duplicate or annotate the focused
   comment, and the two view options (Control+Shift on a Mac, Alt+Shift

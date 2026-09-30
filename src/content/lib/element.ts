@@ -448,7 +448,8 @@ export function serializeElement(
     htmlTruncated,
     styles,
     stylesTruncated,
-    viewport: { width: innerWidth, height: innerHeight },
+    // The viewport now lives in the comment's context, with the other
+    // facts about the moment of capture (older comments keep it here).
     screenshotClipped,
   };
 }

@@ -125,6 +125,12 @@ h1 {
   margin: 4px 0 0;
   white-space: pre-wrap;
 }
+/* The moment a comment was made: small and muted, under its text. */
+.comment-context {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #999;
+}
 .comment-shots {
   display: flex;
   flex-wrap: wrap;

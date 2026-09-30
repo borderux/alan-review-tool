@@ -1,4 +1,5 @@
 import type { Annotation } from "./annotations";
+import type { CommentContext, SessionEnvironment } from "./environment";
 import type { RecursicaDetection } from "./recursica";
 
 // The stored shape of a review session. This is exactly what already sits
@@ -26,6 +27,9 @@ export interface ReviewComment {
   // already baked in, and no objects - load unchanged.
   screenshotClean?: string;
   annotations?: Annotation[];
+  // The window and page when the comment was made, or its screenshot or
+  // element captured (added later; optional). See lib/environment.ts.
+  context?: CommentContext;
 }
 
 // An element picked from the page, like the browser's element inspector.
@@ -42,8 +46,10 @@ export interface CapturedElement {
   // A compact set of computed style properties: name -> value.
   styles: Record<string, string>;
   stylesTruncated: boolean;
-  // The viewport the element was captured in, in CSS pixels.
-  viewport: { width: number; height: number };
+  // The viewport the element was captured in, in CSS pixels. Only on
+  // element comments from before the comment context existed; newer ones
+  // have it in the comment's `context`.
+  viewport?: { width: number; height: number };
   // True when only part of the element was on screen, so the screenshot
   // shows only that part.
   screenshotClipped: boolean;
@@ -64,4 +70,7 @@ export interface Session {
   commentCounter: number;
   details: string;
   pages: Record<string, ReviewPage>;
+  // The reviewer's browser and screen (added later; optional). See
+  // lib/environment.ts.
+  environment?: SessionEnvironment;
 }

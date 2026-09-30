@@ -1,5 +1,6 @@
 import { generateGuid } from "./ids";
 import { sanitizeAnnotations } from "./annotations";
+import { sanitizeContext, sanitizeEnvironment } from "./environment";
 import { sanitizeDetection } from "./recursica";
 import type {
   CapturedElement,
@@ -188,8 +189,31 @@ export function migrateSession(raw: unknown): Session | null {
       el.stylesTruncated = Boolean(el.stylesTruncated);
       el.screenshotClipped = Boolean(el.screenshotClipped);
       if (!el.styles || typeof el.styles !== "object") el.styles = {};
-      if (!el.viewport || typeof el.viewport !== "object")
-        el.viewport = { width: 0, height: 0 };
+      // Older element comments carry their viewport; newer ones keep it
+      // in the comment's context instead. A malformed one is dropped.
+      if (
+        "viewport" in el &&
+        (!el.viewport ||
+          typeof el.viewport !== "object" ||
+          typeof el.viewport.width !== "number" ||
+          typeof el.viewport.height !== "number")
+      )
+        delete el.viewport;
+    }
+  }
+  // The reviewer's environment (session) and each comment's context
+  // (added later): kept field by field when well-formed, else dropped.
+  if ("environment" in session) {
+    const env = sanitizeEnvironment(session.environment);
+    if (env) session.environment = env;
+    else delete session.environment;
+  }
+  for (const page of Object.values(session.pages)) {
+    for (const comment of page.comments) {
+      if (!("context" in comment)) continue;
+      const ctx = sanitizeContext(comment.context);
+      if (ctx) comment.context = ctx;
+      else delete comment.context;
     }
   }
   if (!session.guid) session.guid = generateGuid();

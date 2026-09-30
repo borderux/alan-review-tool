@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  commentContextNow,
+  sessionEnvironmentNow,
+  type SessionEnvironment,
+} from "./lib/environment";
 import { generateGuid } from "./lib/ids";
 import { renumberComments, saveReviewer, saveSession } from "./lib/storage";
 import type { RecursicaDetection } from "./lib/recursica";
@@ -21,6 +26,7 @@ function newSession(): Session {
     commentCounter: 0,
     pages: {},
     details: "",
+    environment: sessionEnvironmentNow(),
   };
 }
 
@@ -143,6 +149,8 @@ export function useReviewSession({
       const comment: ReviewComment = {
         text: "",
         screenshot: null,
+        // The moment it was made; a capture passes its own.
+        context: commentContextNow(),
         ...fields,
         id: Math.max(Date.now(), lastId + 1),
         commentNumber,
@@ -193,6 +201,18 @@ export function useReviewSession({
         ),
         mode,
       );
+    },
+    [commit],
+  );
+
+  // Records (or refreshes) the reviewer's environment on the session.
+  const setEnvironment = useCallback(
+    (environment: SessionEnvironment) => {
+      const current = latest.current;
+      if (!current) return;
+      if (JSON.stringify(current.environment) === JSON.stringify(environment))
+        return;
+      commit({ ...current, environment }, "now");
     },
     [commit],
   );
@@ -300,6 +320,7 @@ export function useReviewSession({
     updateComment,
     deleteComment,
     setPageRecursica,
+    setEnvironment,
     setDetails,
     startOver,
     setUserName,

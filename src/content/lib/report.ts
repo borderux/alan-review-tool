@@ -10,6 +10,7 @@ import { formatCount, formatDateTimeWithZone, plural } from "./format";
 import { commentName, formatCommentId } from "./ids";
 import { commentHref } from "./links";
 import type { RecursicaDetection } from "./recursica";
+import type { CommentContext, SessionEnvironment } from "./environment";
 import type { CapturedElement, Session } from "./types";
 
 function escapeHtml(str: string): string {
@@ -34,7 +35,7 @@ function elementHtml(el: CapturedElement): string {
     .join("\n");
   // A visible "Element" label first, so a person can tell what the
   // selector line below it is.
-  return `<div class="comment-element"><p class="element-label">Element</p><p class="element-selector"><code>${escapeHtml(el.selector)}</code></p><p class="element-meta">Viewport ${formatCount(el.viewport.width)} × ${formatCount(el.viewport.height)}</p>${notes.map((n) => `<p class="element-note">${escapeHtml(n)}</p>`).join("")}<details class="element-html"><summary>HTML</summary><pre><code>${escapeHtml(el.html)}</code></pre></details><details class="element-styles"><summary>Styles</summary><pre><code>${escapeHtml(styles)}</code></pre></details></div>`;
+  return `<div class="comment-element"><p class="element-label">Element</p><p class="element-selector"><code>${escapeHtml(el.selector)}</code></p>${el.viewport ? `<p class="element-meta">Viewport ${formatCount(el.viewport.width)} × ${formatCount(el.viewport.height)}</p>` : ""}${notes.map((n) => `<p class="element-note">${escapeHtml(n)}</p>`).join("")}<details class="element-html"><summary>HTML</summary><pre><code>${escapeHtml(el.html)}</code></pre></details><details class="element-styles"><summary>Styles</summary><pre><code>${escapeHtml(styles)}</code></pre></details></div>`;
 }
 
 // A page's Recursica line: what was detected about the reviewed page (not
@@ -77,6 +78,92 @@ function recursicaLine(d: RecursicaDetection | undefined): string {
         : `${d.themeMode} theme`,
     );
   return `<p class="page-recursica" ${attrs}>Recursica: ${parts.join(", ")}</p>`;
+}
+
+const attr = (name: string, value: string | number | undefined) =>
+  value === undefined || value === ""
+    ? ""
+    : ` ${name}="${escapeHtml(String(value))}"`;
+
+// The reviewer's environment, in words for people and as meta tags for
+// agents. The color scheme and reduced-motion preference are read now, at
+// report time.
+function environmentHtml(env: SessionEnvironment | undefined) {
+  const scheme = matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const b = env?.browser,
+    o = env?.os;
+  const browser = b ? `${b.name}${b.version ? ` ${b.version}` : ""}` : "";
+  const os = o ? `${o.name}${o.version ? ` ${o.version}` : ""}` : "";
+  const parts = [
+    browser && (os ? `${browser} on ${os}` : browser),
+    !browser && os,
+    env?.language && `language ${env.language}`,
+    env?.timeZone,
+    env?.screen &&
+      `screen ${formatCount(env.screen.width)} × ${formatCount(env.screen.height)}`,
+    `${scheme} mode`,
+    reduced ? "reduced motion" : "",
+  ].filter(Boolean) as string[];
+  const meta = [
+    ["snippy-browser", b?.name],
+    ["snippy-browser-version", b?.version],
+    ["snippy-os", o?.name],
+    ["snippy-os-version", o?.version],
+    ["snippy-user-agent", env?.userAgent],
+    ["snippy-language", env?.language],
+    ["snippy-time-zone", env?.timeZone],
+    [
+      "snippy-screen",
+      env?.screen && `${env.screen.width}x${env.screen.height}`,
+    ],
+    ["snippy-color-scheme", scheme],
+    ["snippy-reduced-motion", reduced ? "reduce" : "no-preference"],
+  ]
+    .filter(([, v]) => v)
+    .map(([n, v]) => `<meta name="${n}" content="${escapeHtml(String(v))}">`)
+    .join("\n");
+  return {
+    meta,
+    line: `<p class="report-meta report-environment">Environment: ${escapeHtml(parts.join(" · "))}</p>`,
+  };
+}
+
+// A comment's context: one small line in words, the same facts as data
+// attributes. Absent for comments made before the context existed.
+function contextHtml(c: CommentContext | undefined): string {
+  if (!c) return "";
+  const words = [
+    c.viewport &&
+      `Viewport ${formatCount(c.viewport.width)} × ${formatCount(c.viewport.height)}${c.dpr ? ` at ${Number(c.dpr.toFixed(2))}x` : ""}`,
+    c.zoom && c.zoom !== 1 ? `zoomed ${Number(c.zoom.toFixed(2))}x` : "",
+    c.colorScheme,
+    c.pageTheme && c.pageTheme !== c.colorScheme
+      ? `page theme ${c.pageTheme}`
+      : "",
+    c.scroll &&
+      `scrolled ${formatCount(c.scroll.y)}${c.scrollHeight ? ` of ${formatCount(c.scrollHeight)}` : ""}`,
+    c.capturedAt && formatDateTimeWithZone(c.capturedAt),
+  ].filter(Boolean) as string[];
+  const attrs = [
+    attr(
+      "data-captured-at",
+      c.capturedAt && new Date(c.capturedAt).toISOString(),
+    ),
+    attr("data-viewport-width", c.viewport?.width),
+    attr("data-viewport-height", c.viewport?.height),
+    attr("data-dpr", c.dpr),
+    attr("data-zoom", c.zoom),
+    attr("data-scroll-x", c.scroll?.x),
+    attr("data-scroll-y", c.scroll?.y),
+    attr("data-scroll-height", c.scrollHeight),
+    attr("data-color-scheme", c.colorScheme),
+    attr("data-page-theme", c.pageTheme),
+    attr("data-page-lang", c.lang),
+  ].join("");
+  return `<p class="comment-context"${attrs}>${escapeHtml(words.join(" · "))}</p>`;
 }
 
 export function totalCommentCount(session: Session | null): number {
@@ -158,7 +245,7 @@ export function buildReportHtml({
           const linkHtml = href
             ? `<p class="comment-link"><a href="${escapeHtml(href)}">${escapeHtml(linkText)}</a></p>`
             : "";
-          return `<div class="comment" data-comment-id="${escapeHtml(commentId)}"><div class="comment-body">${hasNumber ? `<p class="comment-id">${escapeHtml(commentName(comment.commentNumber, true))}</p>` : ""}${linkHtml}<p class="comment-text">${escapeHtml(comment.text).replace(/\n/g, "<br>")}</p>${comment.element ? elementHtml(comment.element) : ""}</div>${shotsHtml}</div>`;
+          return `<div class="comment" data-comment-id="${escapeHtml(commentId)}"><div class="comment-body">${hasNumber ? `<p class="comment-id">${escapeHtml(commentName(comment.commentNumber, true))}</p>` : ""}${linkHtml}<p class="comment-text">${escapeHtml(comment.text).replace(/\n/g, "<br>")}</p>${contextHtml(comment.context)}${comment.element ? elementHtml(comment.element) : ""}</div>${shotsHtml}</div>`;
         })
         .join("\n");
 
@@ -173,6 +260,8 @@ ${commentsHtml}
     })
     .join("\n");
 
+  const env = environmentHtml(session?.environment);
+
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -184,6 +273,7 @@ ${session?.guid ? `<meta name="snippy-session-id" content="${escapeHtml(session.
 <meta name="snippy-built-with-adapter-version" content="${escapeHtml(__ADAPTER_VERSION__)}">
 <meta name="snippy-built-with-forge-version" content="${escapeHtml(__FORGE_VERSION__)}">
 <meta name="snippy-built-with-transform-version" content="${escapeHtml(__TRANSFORM_VERSION__)}">
+${env.meta}
 <meta name="ai-report-instructions" content="${escapeHtml(AI_INSTRUCTIONS)}">
 <style>${REPORT_CSS}</style>
 </head>
@@ -194,6 +284,7 @@ ${session?.guid ? `<meta name="snippy-session-id" content="${escapeHtml(session.
 ${userName ? `<p class="report-meta">Reviewer: ${escapeHtml(userName)}</p>` : ""}
 ${userEmail ? `<p class="report-meta">Email: ${escapeHtml(userEmail)}</p>` : ""}
 ${session?.details ? `<p class="report-meta">Details: ${escapeHtml(session.details)}</p>` : ""}
+${env.line}
 <p class="report-meta report-built-with">Snippy ${escapeHtml(__APP_VERSION__)} built with: @recursica/adapter-mantine-v8 ${escapeHtml(__ADAPTER_VERSION__)}, Forge theme ${escapeHtml(__FORGE_VERSION__)} (transform ${escapeHtml(__TRANSFORM_VERSION__)})</p>
 </div>
 <nav class="toc">
