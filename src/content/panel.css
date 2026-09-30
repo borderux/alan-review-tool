@@ -20,19 +20,19 @@
    re-pointed for the panel only, here, in one place. The proper home is
    the Forge theme's ui-kit values; remove this block once Forge carries
    them. See ARCHITECTURE.md, "Adapter workarounds".
-   - panel body padding (24px across, 16px down) -> general small (4px)
-   - card padding (24px) -> general small (4px)
+   - panel body padding (24px across, 16px down) -> general default (8px)
+   - card padding (24px) -> general default (8px)
    - card corner radius, layer 0 light and dark (the brand's layer-1
      radius, 24px) -> 12px */
 .art-root {
   --recursica_ui-kit_components_panel_properties_content-horizontal-padding: var(
-    --recursica_brand_dimensions_general_sm
+    --recursica_brand_dimensions_general_default
   );
   --recursica_ui-kit_components_panel_properties_content-vertical-padding: var(
-    --recursica_brand_dimensions_general_sm
+    --recursica_brand_dimensions_general_default
   );
   --recursica_ui-kit_components_card_properties_padding: var(
-    --recursica_brand_dimensions_general_sm
+    --recursica_brand_dimensions_general_default
   );
   --recursica_ui-kit_modes_light_layer_0_components_card_properties_borders_border-radius: 12px;
   --recursica_ui-kit_modes_dark_layer_0_components_card_properties_borders_border-radius: 12px;
@@ -89,7 +89,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--recursica_brand_dimensions_general_sm);
+  gap: var(--recursica_brand_dimensions_general_default);
   /* Exactly the width of the Comment text box beneath it, at every panel
      width: the full content width, up to the same token that caps the
      stacked text box (so on a wide panel both stop at that width). */
@@ -99,13 +99,13 @@
     --recursica_ui-kit_components_textarea_variants_layouts_stacked_properties_max-width
   );
   box-sizing: border-box;
-  /* The theme's general small dimension (4px), like the card around it. */
-  padding: var(--recursica_brand_dimensions_general_sm);
+  /* The theme's general default dimension (8px), like the card around it. */
+  padding: var(--recursica_brand_dimensions_general_default);
   border: var(--recursica_ui-kit_components_panel_properties_border-size) solid
     var(--recursica_ui-kit_components_panel_properties_colors_border-color);
   /* Concentric with the card: the card's 12px radius minus the card's
-     4px padding is 8px, the brand's default radius. */
-  border-radius: var(--recursica_brand_dimensions_border-radii_default);
+     8px padding is 4px, the brand's small radius. */
+  border-radius: var(--recursica_brand_dimensions_border-radii_sm);
 }
 /* The image scales to the frame's width, keeping its aspect ratio - never
    stretched or cropped. (Its hand-set 320px height cap was removed in the

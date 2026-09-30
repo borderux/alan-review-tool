@@ -63,7 +63,12 @@ export function CommentList({
   onAnnotate,
 }: CommentListProps) {
   const list = (group: PageGroup, label: string) => (
-    <Stack component="ol" className="art-list" aria-label={label} gap="rec-sm">
+    <Stack
+      component="ol"
+      className="art-list"
+      aria-label={label}
+      gap="rec-default"
+    >
       {group.comments.map((comment) => (
         <CommentItem
           key={comment.id}

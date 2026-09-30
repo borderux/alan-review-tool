@@ -122,11 +122,11 @@ export function CommentItem({
           content, rather than a Card.Header, whose own padding and divider
           make every card much taller. Then the Comment field, then the
           screenshot or element beneath it. The parts are spaced by the
-          theme's general small dimension (rec-sm, 4px), and so is the
+          theme's general default dimension (rec-default, 8px), and so is the
           card's padding (owner-requested token remap in panel.css). */}
       <Card>
         <Card.Content>
-          <Stack gap="rec-sm">
+          <Stack gap="rec-default">
             <Group justify="space-between" wrap="nowrap" gap="rec-sm">
               <Heading
                 order={headingOrder}
@@ -185,50 +185,56 @@ export function CommentItem({
                 </Menu>
               </Group>
             </Group>
-            <TextArea
-              ref={textRef}
-              label="Comment"
-              {...fieldLayout(formLayout)}
-              autosize
-              minRows={1}
-              placeholder={
-                comment.element
-                  ? "Describe the change or feedback for this element"
-                  : hasShot
-                    ? "Describe the change or feedback for this screenshot"
-                    : "Describe the change or feedback"
-              }
-              value={comment.text}
-              onChange={(event) => onTextChange(event.currentTarget.value)}
-            />
+            {/* The Comment field carries the kit's own 8px bottom margin
+                (the form's gap between fields), so it and the material
+                below it sit in a gapless Stack: the space between them is
+                that 8px, not 8px plus the card's gap. */}
+            <Stack gap="rec-none">
+              <TextArea
+                ref={textRef}
+                label="Comment"
+                {...fieldLayout(formLayout)}
+                autosize
+                minRows={1}
+                placeholder={
+                  comment.element
+                    ? "Describe the change or feedback for this element"
+                    : hasShot
+                      ? "Describe the change or feedback for this screenshot"
+                      : "Describe the change or feedback"
+                }
+                value={comment.text}
+                onChange={(event) => onTextChange(event.currentTarget.value)}
+              />
 
-            {/* Below the Comment field, the supporting material, framed on its own: the image, a
+              {/* Below the Comment field, the supporting material, framed on its own: the image, a
                 short summary for an element, and the button that acts on
                 the image. The full selector, HTML and styles are in the
                 report. With images hidden there is no frame: the summary
                 and the button stay, so annotating still works. */}
-            {hasShot && showImages && (
-              <div className="art-shot-frame">
-                <img
-                  className="art-thumb"
-                  src={comment.screenshot ?? undefined}
-                  alt={
-                    comment.element
-                      ? `Screenshot of the element in ${name}`
-                      : `Screenshot attached to ${name}`
-                  }
-                />
-                {summary}
-                {annotate}
-              </div>
-            )}
-            {hasShot && !showImages && (
-              <Stack gap="rec-sm" align="flex-start">
-                {summary}
-                {annotate}
-              </Stack>
-            )}
-            {!hasShot && summary}
+              {hasShot && showImages && (
+                <div className="art-shot-frame">
+                  <img
+                    className="art-thumb"
+                    src={comment.screenshot ?? undefined}
+                    alt={
+                      comment.element
+                        ? `Screenshot of the element in ${name}`
+                        : `Screenshot attached to ${name}`
+                    }
+                  />
+                  {summary}
+                  {annotate}
+                </div>
+              )}
+              {hasShot && !showImages && (
+                <Stack gap="rec-default" align="flex-start">
+                  {summary}
+                  {annotate}
+                </Stack>
+              )}
+              {!hasShot && summary}
+            </Stack>
           </Stack>
         </Card.Content>
       </Card>
