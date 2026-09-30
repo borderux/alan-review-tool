@@ -35,7 +35,7 @@ Recursica design system and bundled by Vite into one content script;
   - `App.tsx` - the Mantine provider, configured for the shadow root, and
     the Recursica layer-0 scope.
   - `ReviewPanel.tsx` - the panel shell: open/close, Escape, focus, the
-    footer (Start over, Download report (all n comments), which wraps onto two lines below about 470 px), toast and modals, and the
+    footer (Start over, Download report (all n, then a chat icon), which wraps onto two lines only at 400 px with a four-digit count), toast and modals, and the
     failed-load state (storage could not be read: the panel opens empty,
     Add disabled, with a message in its body).
   - `components/` - the one view (`CommentList`: the current page's
@@ -310,13 +310,15 @@ Kept, our own elements that no component covers (tokens only, owner-requested):
 
 - `panel.css` `.art-shot-frame` (the bordered frame around a comment's image; no image component), `.art-thumb` (image scales to the frame), `.art-shot-well` / `.art-shot-scroll` (the editor's bordered, scrolling image area), `.art-shot` canvases (drawing), `.art-swatch` (pen colours are baked into screenshots, so fixed), `.art-sr-only` (no visually-hidden utility), `.art-list` (reset for the list semantics a card set needs).
 
-Owner-approved exceptions, not adapter bugs (rounds 13 and 16):
+Owner-approved exceptions, not adapter bugs (rounds 13, 16 and 18):
 
-- `panel.css` token remap block also sets `--recursica_ui-kit_components_textarea_properties_rows` (Forge: 4) to 1, so every text box starts at one row and grows and shrinks with its text (with the kit's `autosize`). Gap: "TextArea should allow rows/min-height to be set by the consumer."
+- Kept as they are, by owner decision (round 18): the visible "View" group label above the two checkboxes; no element link in the panel's cards (the page and element links are in the report); the error toast at the top-left of the page (the adapter's Toast has no placement - its gap stays filed); confirmation text at the full dialog width; no Add screenshot button on another page's comment (a new screenshot would capture the page that is open, not that comment's page); the failed-load message in the panel body; page links in the same tab and page titles at link size; no heading trim in Firefox until it supports it; Snippy's Alt+Shift shortcuts taking priority over a page's own access keys in Firefox on Windows and Linux; the manifest `author` string (Chrome ignores it, Firefox reads it); and the suggested browser shortcut Alt+Shift+K.
+
+- `panel.css` token remap block also sets `--recursica_ui-kit_components_textarea_properties_rows` (Forge: 4) to 1 (approved by the owner in round 18), so every text box starts at one row and grows and shrinks with its text (with the kit's `autosize`). Gap: "TextArea should allow rows/min-height to be set by the consumer."
 - `AnnotationEditor.tsx` a flexible spacer in `Modal.Footer` (`<Group flex={1} aria-hidden />`) puts the rarely used Delete screenshot at the bottom left, apart from Cancel and Save (re-added in round 16). Gap: "Modal.Footer has no slot for a rarely used action on the left."
 - Several solid buttons on one surface: the header Add, a card's Add screenshot, and Download report.
 - A comment is never deleted for being blank; only Delete (with its confirmation) removes one. Blank comments count, and are in the report.
-- The footer's label "Download report (all n comments)" names the whole report, not just the comments showing.
+- The footer's label "Download report (all n [chat icon])" - a decorative Phosphor `ChatCircle` after the count, with the accessible name "Download report, all n comments" - names the whole report, not just the comments showing. The kit's Button has a leading-icon slot only, so the icon sits in the label, sized to the text (`.art-label-icon` aligns it). Gap: "Button has no trailing-icon slot for an icon inside the label."
 
 - `panel.css` token remap block on `.art-root` - owner-requested token remap. The panel body's content padding (`--recursica_ui-kit_components_panel_properties_content-horizontal-padding`, 24 px, and `...content-vertical-padding`, 16 px) and the card padding (`--recursica_ui-kit_components_card_properties_padding`, 24 px) are re-pointed to the brand's general default dimension (`--recursica_brand_dimensions_general_default`, 8 px; round 13 used general small, 4 px, which the owner found too tight); the card radius for layer 0 (`--recursica_ui-kit_modes_light_layer_0_components_card_properties_borders_border-radius` and the `dark` twin, 24 px via the brand's layer-1 radius) is set to 12 px, which no theme radius token equals. No element is styled; only these token values change. Their proper home is the Forge theme's ui-kit values; remove the block once Forge carries them.
 - `panel.css` `text-box: trim-both cap alphabetic` on the panel title and the card number headings, inside `@supports (text-box-trim: trim-both)` - owner-suggested fix for the theme's heading line-box bug: the header type (Dongle at 56 px, 39.2 px line height) puts the glyphs off the centre of their line box. Trimmed, the title's cap height centres on Add and Close within 0.5 px (was 4.6 px high) and a card number on its buttons within 1 px (was 4.8 px). The header gets 4 px shorter (64 to 60 px) and the number row 1.6 px shorter; descenders still show. Firefox doesn't support it yet and shows the theme's own line box.
@@ -377,12 +379,17 @@ field, is deleted on load.
 
 The page key is the address the panel is on right now. Single-page apps
 change it without a reload, and a content script can't see the page's own
-history calls, so `usePageKey()` re-reads it on a short interval; comments
-added after an in-app navigation are filed under the new address. The key
-is `origin + pathname + search`: **it leaves out the fragment**, so an app
-that routes by hash (`#/orders/42`, `#/orders/43`) files every route under
-one page. Changing that is a stored-shape decision (existing sessions keep
-their keys), so it is raised with the owner rather than made silently.
+history calls, so `usePageKey()` re-reads it on a short interval, and at
+once on `hashchange` and `popstate`; comments added after an in-app
+navigation are filed under the new address. The key (`currentPageKey()` in
+`lib/page.ts`) is `origin + pathname + search`, plus the fragment when it is
+a route (`#/...` or `#!...`): since round 18 (owner-approved), each hash
+route is its own page - its own report section, its own group in the
+all-pages view, its own "Only view comments for this url" scope. A plain
+fragment (`#top`, `#section`) is not a different page. **Stored keys are
+not rewritten:** comments filed before round 18 under an address without
+its route stay under that key (they show on the route-less address, and in
+the all-pages view).
 
 An element comment's report link adds `#<id>` only when the page address
 has no fragment of its own; on a hash-route address it links to the page,

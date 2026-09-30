@@ -265,3 +265,9 @@
     text-box: trim-both cap alphabetic;
   }
 }
+
+/* The chat icon inside the Download report label: on the text's line, not
+   below it. (The kit's Button has no slot for an icon inside its label.) */
+.art-label-icon {
+  vertical-align: -0.2em;
+}

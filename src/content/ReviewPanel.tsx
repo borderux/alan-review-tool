@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ChatCircle } from "@phosphor-icons/react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -21,7 +22,7 @@ import { DownloadModal, type ReportDetails } from "./components/DownloadModal";
 import { ResizeHandle } from "./components/ResizeHandle";
 import { ViewOptions } from "./components/ViewOptions";
 import { captureElement, captureRegion } from "./lib/capture";
-import { plural } from "./lib/format";
+import { formatCount, plural } from "./lib/format";
 import { commentName } from "./lib/ids";
 import {
   commentContextNow,
@@ -659,9 +660,24 @@ export function ReviewPanel({
                 }
                 onClick={() => setDownloadOpen(true)}
               >
-                {total > 0
-                  ? `Download report (all ${plural(total, "comment", "comments")})`
-                  : "Download report"}
+                {/* A chat icon stands for "comments" after the count (owner
+                    decision); it is decorative - the accessible name above
+                    says it in words. The kit's Button has a leading-icon
+                    slot only, so the icon sits in the label, sized to the
+                    text. */}
+                {total > 0 ? (
+                  <>
+                    Download report (all {formatCount(total)}{" "}
+                    <ChatCircle
+                      aria-hidden
+                      size="1.15em"
+                      className="art-label-icon"
+                    />
+                    )
+                  </>
+                ) : (
+                  "Download report"
+                )}
               </Button>
             </Group>
           </Group>

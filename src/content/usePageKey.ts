@@ -12,11 +12,21 @@ const CHECK_MS = 500;
 export function usePageKey(): string {
   const [pageKey, setPageKey] = useState(currentPageKey);
   useEffect(() => {
-    const timer = setInterval(() => {
+    const check = () => {
       const next = currentPageKey();
       setPageKey((current) => (current === next ? current : next));
-    }, CHECK_MS);
-    return () => clearInterval(timer);
+    };
+    // Hash routes and back/forward are noticed at once; pushState and
+    // replaceState can't be seen from a content script, so the interval
+    // catches those.
+    const timer = setInterval(check, CHECK_MS);
+    window.addEventListener("hashchange", check);
+    window.addEventListener("popstate", check);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("hashchange", check);
+      window.removeEventListener("popstate", check);
+    };
   }, []);
   return pageKey;
 }

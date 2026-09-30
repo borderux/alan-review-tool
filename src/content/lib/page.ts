@@ -17,8 +17,14 @@ export const LEGACY_HOSTS = [
 // instance that owns the panel can close it cleanly (see main.tsx).
 export const CLOSE_EVENT = "snippy:close";
 
+// The key a page's comments are filed under: origin, path and query, plus
+// the fragment when it is a route (#/... or #!..., as hash-routed apps
+// use), so each route is its own page. A plain fragment (#top, #section)
+// is not a different page. Keys stored before hash routes counted stay as
+// they were.
 export function currentPageKey(): string {
-  return location.origin + location.pathname + location.search;
+  const route = /^#[/!]/.test(location.hash) ? location.hash : "";
+  return location.origin + location.pathname + location.search + route;
 }
 
 export function pushPage(width: number): void {
