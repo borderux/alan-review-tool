@@ -4,11 +4,21 @@
 // "Failed to read config from file" and fails the Husky pre-commit hook
 // outright.
 module.exports = {
-  // For all non-JS files, just format them.
+  // For all non-code files, just format them.
   "*.{json,md,css}": ["prettier --write"],
 
-  // For JS files: format and lint only the staged files. No type-check or
-  // test step - this is a plain-JS project with no TypeScript and no test
-  // script wired into package.json yet.
-  "*.js": (filenames) => [`prettier --write ${filenames.join(" ")}`, `eslint --fix ${filenames.join(" ")}`],
+  // Plain JS files: format and lint only the staged files.
+  "*.{js,cjs,mjs}": (filenames) => [
+    `prettier --write ${filenames.join(" ")}`,
+    `eslint --fix ${filenames.join(" ")}`,
+  ],
+
+  // TypeScript: format and lint the staged files, then type-check the
+  // whole project. tsc cannot check a single file in isolation against
+  // tsconfig.json, so the type-check deliberately ignores the file list.
+  "*.{ts,tsx,mts}": (filenames) => [
+    `prettier --write ${filenames.join(" ")}`,
+    `eslint --fix ${filenames.join(" ")}`,
+    "npm run typecheck",
+  ],
 };

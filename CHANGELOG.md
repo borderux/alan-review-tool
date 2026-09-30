@@ -1,4 +1,4 @@
-# alan-review-tool
+# snippy
 
 ## 0.2.0
 

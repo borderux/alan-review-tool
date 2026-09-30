@@ -1,39 +1,49 @@
+/* The downloaded report's own styles: a standalone file, so plain values,
+   not the panel's design tokens. Zero JavaScript: the lightbox is :target. */
 body {
   font-family: system-ui, sans-serif;
   color: #1e1e2e;
-  max-width: 600px;
+  line-height: 1.45;
+  max-width: 640px;
   margin: 40px auto;
   padding: 0 16px;
+  overflow-wrap: anywhere;
 }
 h1 {
-  font-size: 18px;
-  margin: 0 0 4px;
-}
-.report-meta {
-  font-size: 12px;
-  color: #666;
-  margin: 0 0 4px;
+  font-size: 20px;
+  margin: 0 0 8px;
 }
 .report-header {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+}
+.report-meta {
+  font-size: 13px;
+  color: #555;
+  margin: 0 0 2px;
+}
+/* What Snippy was built with: a footnote to the header, not part of it. */
+.report-built-with {
+  margin-top: 10px;
+  font-size: 11px;
+  color: #888;
 }
 
 .toc {
-  margin: 0 0 20px;
-  padding: 12px;
+  margin: 0 0 24px;
+  padding: 12px 14px;
   background: #f5f5f5;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 .toc h2 {
-  font-size: 13px;
+  font-size: 12px;
   margin: 0 0 6px;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   color: #666;
 }
 .toc ol {
   margin: 0;
-  padding-left: 18px;
+  padding-left: 20px;
   font-size: 13px;
 }
 .toc li {
@@ -42,6 +52,7 @@ h1 {
 .toc a {
   color: #2563eb;
   text-decoration: none;
+  word-break: break-all;
 }
 .toc a:hover {
   text-decoration: underline;
@@ -49,12 +60,12 @@ h1 {
 
 .page-section {
   border-top: 2px solid #ddd;
-  padding-top: 12px;
-  margin-top: 20px;
+  padding-top: 16px;
+  margin-top: 28px;
 }
 .page-url {
-  font-size: 14px;
-  margin: 0 0 12px;
+  font-size: 15px;
+  margin: 0 0 4px;
 }
 .page-url a {
   color: #2563eb;
@@ -64,47 +75,94 @@ h1 {
 .page-url a:hover {
   text-decoration: underline;
 }
+.page-recursica {
+  font-size: 12px;
+  color: #666;
+  margin: 0 0 8px;
+}
 
+/* One comment: its number, its link, its text, then any element details
+   and the screenshot thumbnail beneath. */
 .comment {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   border-top: 1px solid #eee;
-  padding: 8px 0;
+  padding: 14px 0;
 }
 .comment:first-of-type {
   border-top: none;
 }
 .comment-body {
-  flex: 1;
   min-width: 0;
 }
 .comment-id {
-  font-family: ui-monospace, monospace;
-  font-size: 10px;
-  color: #aaa;
-  margin: 0 0 2px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  margin: 0;
+  display: inline;
+}
+/* The link back to the page: short and muted, on the number's line. */
+.comment-link {
+  display: inline;
+  margin: 0 0 0 8px;
+  font-size: 11px;
+}
+.comment-link a {
+  color: #888;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-decoration-color: #ccc;
+  word-break: break-all;
+}
+.comment-link a:hover {
+  color: #2563eb;
 }
 .comment-text {
-  font-size: 13px;
-  margin: 0;
+  font-size: 14px;
+  margin: 4px 0 0;
   white-space: pre-wrap;
 }
+/* The moment a comment was made: small and muted, under its text. */
+.comment-context {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #999;
+}
 .comment-shots {
-  flex-shrink: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
+/* Thumbnails keep the image's shape: at most 64px tall and the column's
+   width, never cropped, so a wide strip or a tall crop still reads. The
+   lightbox shows the full image. */
+/* An annotated screenshot shows two labelled figures side by side. */
+.shot {
+  margin: 0;
+  max-width: 100%;
+}
+.shot figcaption {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #666;
+}
 .shot-thumb-link {
   display: inline-block;
+  max-width: 100%;
 }
 .shot-thumb {
   display: block;
-  width: 50px;
-  height: 50px;
-  object-fit: cover;
+  box-sizing: border-box;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 64px;
+  object-fit: contain;
+  background: #f5f5f5;
   border-radius: 4px;
   border: 1px solid #ccc;
 }
@@ -129,4 +187,72 @@ h1 {
   max-width: 90vw;
   max-height: 90vh;
   border-radius: 4px;
+  background: #fff;
+}
+
+/* An element comment's captured element. */
+.comment-element {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-left: 3px solid #ddd;
+  font-size: 12px;
+}
+.comment-element p {
+  margin: 0 0 2px;
+}
+.element-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #666;
+}
+.element-selector code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+}
+.element-meta,
+.element-note {
+  color: #666;
+}
+.comment-element details {
+  margin-top: 4px;
+}
+.comment-element summary {
+  cursor: pointer;
+}
+.comment-element pre {
+  margin: 4px 0 0;
+  padding: 8px;
+  max-height: 240px;
+  overflow: auto;
+  background: #f5f5f5;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+@media print {
+  body {
+    max-width: none;
+    margin: 0;
+  }
+  .toc {
+    background: none;
+    border: 1px solid #ddd;
+  }
+  .comment,
+  .comment-element pre {
+    break-inside: avoid;
+  }
+  .comment-element pre {
+    max-height: none;
+    overflow: visible;
+  }
+  .lightbox,
+  .lightbox:target {
+    display: none;
+  }
 }
