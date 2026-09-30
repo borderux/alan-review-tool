@@ -141,6 +141,17 @@ export function migrateSession(raw: unknown): Session | null {
     if (clean) page.recursica = clean;
     else delete page.recursica;
   }
+  // Screenshots may carry the device pixel ratio they were captured at
+  // (`screenshotScale`, added later). Kept only if it is a plausible ratio;
+  // missing or bad, the panel uses the current ratio instead.
+  for (const page of Object.values(session.pages)) {
+    for (const comment of page.comments) {
+      if (!("screenshotScale" in comment)) continue;
+      const scale = comment.screenshotScale;
+      if (typeof scale !== "number" || !(scale > 0 && scale <= 8))
+        delete comment.screenshotScale;
+    }
+  }
   // Element comments (added later) carry an optional `element` field. Old
   // sessions simply don't have it; a malformed one - anything without a
   // selector and HTML - is dropped rather than reaching the UI.

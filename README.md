@@ -38,8 +38,8 @@ JavaScript in what you export.
   light or dark mode following your operating system.
 - **Resizable panel** (400 to 720 px, 440 by default) that remembers its
   width (drag the left edge, or
-  focus it and use the arrow keys). Download comments (with the number
-  of comments across every page) asks for the
+  focus it and use the arrow keys). Download report (all n comments,
+  across every page) asks for the
   reviewer's name, email and session details each time, prefilled with
   the last values used.
 - **Exports a single, self-contained HTML report** — header, table of

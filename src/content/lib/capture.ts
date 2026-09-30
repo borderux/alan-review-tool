@@ -194,7 +194,10 @@ async function sendCaptureRequest(
   return undefined;
 }
 
-export type CaptureResult = { dataUrl: string } | { error: string };
+// `scale` is the device pixel ratio the image was captured at: its pixels
+// divided by the scale give its natural size in CSS px.
+export type CaptureResult =
+  { dataUrl: string; scale: number } | { error: string };
 
 export async function captureAndCrop(rect: Rect): Promise<CaptureResult> {
   // Give the compositor a couple of frames to paint the panel as hidden
@@ -230,7 +233,7 @@ export async function captureAndCrop(rect: Rect): Promise<CaptureResult> {
   );
   // JPEG rather than PNG - a UI screenshot has enough gradients (shadows,
   // anti-aliased text) that lossy compression saves real space.
-  return { dataUrl: canvas.toDataURL("image/jpeg", 0.85) };
+  return { dataUrl: canvas.toDataURL("image/jpeg", 0.85), scale: dpr };
 }
 
 // Runs a capture with the panel hidden and the page at its full width,
@@ -272,7 +275,8 @@ export async function captureRegion(
 }
 
 export type ElementCaptureResult =
-  { element: CapturedElement; dataUrl: string | null } | { error: string };
+  | { element: CapturedElement; dataUrl: string | null; scale: number }
+  | { error: string };
 
 // Picks an element and captures it: its selector, HTML, styles and
 // viewport, and a screenshot cropped to the part of it that is on screen.
@@ -297,10 +301,11 @@ export async function captureElement(
         picked.element,
         visible?.clipped ?? false,
       );
-      if (!visible) return { element, dataUrl: null };
+      if (!visible)
+        return { element, dataUrl: null, scale: window.devicePixelRatio || 1 };
       const shot = await captureAndCrop(visible.rect);
       if ("error" in shot) return { error: shot.error };
-      return { element, dataUrl: shot.dataUrl };
+      return { element, dataUrl: shot.dataUrl, scale: shot.scale };
     });
   } catch (err) {
     console.error("Snippy: element capture failed.", err);

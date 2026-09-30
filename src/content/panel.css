@@ -23,7 +23,8 @@
    - panel body padding (24px across, 16px down) -> general default (8px)
    - card padding (24px) -> general default (8px)
    - card corner radius, layer 0 light and dark (the brand's layer-1
-     radius, 24px) -> 12px */
+     radius, 24px) -> 12px
+   - text box minimum rows (4) -> 1, so a text box hugs its text */
 .art-root {
   --recursica_ui-kit_components_panel_properties_content-horizontal-padding: var(
     --recursica_brand_dimensions_general_default
@@ -36,6 +37,9 @@
   );
   --recursica_ui-kit_modes_light_layer_0_components_card_properties_borders_border-radius: 12px;
   --recursica_ui-kit_modes_dark_layer_0_components_card_properties_borders_border-radius: 12px;
+  /* Text boxes start at one row and grow with their text (with the kit's
+     autosize); the theme's rows token fixes a 4-row minimum. */
+  --recursica_ui-kit_components_textarea_properties_rows: 1;
 }
 
 /* Approved exception: the user-resizable panel width. The kit's panel has
@@ -110,10 +114,15 @@
 /* The image scales to the frame's width, keeping its aspect ratio - never
    stretched or cropped. (Its hand-set 320px height cap was removed in the
    adapter-workaround audit: a tall image now shows at full height.) */
+/* It never shows larger than its natural size (its width is set to that
+   on the element), scales down to the frame's width when larger, and
+   sits centred in the frame. */
 .art-thumb {
   display: block;
   width: 100%;
+  max-width: 100%;
   height: auto;
+  align-self: center;
 }
 
 /* The comment list: one card per comment (the kit's Card), so the cards

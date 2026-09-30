@@ -34,7 +34,8 @@ export function AddMenu({
         <Menu.Target>
           <Button
             ref={triggerRef}
-            variant="outline"
+            // Solid (owner decision: several solid buttons on the panel).
+            variant="solid"
             size="small"
             // While the menu is open the icon is an X (owner decision); the
             // name stays "Add" and aria-expanded carries the open state.

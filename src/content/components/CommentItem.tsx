@@ -1,12 +1,10 @@
-import { useEffect, useRef } from "react";
-import type { FocusEvent, MutableRefObject } from "react";
-import { Camera, Copy, DotsThree, Trash, X } from "@phosphor-icons/react";
+import { useEffect, useRef, useState } from "react";
+import { Camera, Copy, Trash } from "@phosphor-icons/react";
 import {
   Button,
   Card,
   Group,
   Heading,
-  Menu,
   Stack,
   Text,
   TextArea,
@@ -16,7 +14,6 @@ import { elementSummary } from "../lib/element";
 import { commentName, formatCommentId } from "../lib/ids";
 import type { ReviewComment } from "../lib/types";
 import { fieldLayout, type FormLayout } from "../ReviewPanel";
-import { useManagedMenu } from "./useManagedMenu";
 
 interface CommentItemProps {
   comment: ReviewComment;
@@ -33,9 +30,7 @@ interface CommentItemProps {
   canAddScreenshot: boolean;
   autoFocus: boolean;
   onFocused: () => void;
-  capturing: MutableRefObject<boolean>;
   onTextChange: (text: string) => void;
-  onLeftEmpty: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
   onAddScreenshot: () => void;
@@ -59,9 +54,7 @@ export function CommentItem({
   canAddScreenshot,
   autoFocus,
   onFocused,
-  capturing,
   onTextChange,
-  onLeftEmpty,
   onDelete,
   onDuplicate,
   onAddScreenshot,
@@ -70,34 +63,24 @@ export function CommentItem({
   const number = formatCommentId(comment.commentNumber);
   const name = commentName(comment.commentNumber);
   const textRef = useRef<HTMLTextAreaElement>(null);
-  const {
-    opened: menuOpened,
-    setOpened: setMenuOpened,
-    triggerRef: menuTriggerRef,
-    firstItemRef: menuFirstItemRef,
-    onDropdownKeyDown: onMenuKeyDown,
-  } = useManagedMenu();
+  const rowRef = useRef<HTMLLIElement>(null);
   const hasShot = Boolean(comment.screenshot);
+  // The image's natural width in CSS px: its pixels divided by the device
+  // pixel ratio it was captured at (the current one for older comments). It
+  // never shows larger than that; a larger one scales down to the frame.
+  const [naturalWidth, setNaturalWidth] = useState<number | null>(null);
 
   // A comment that was just created (or duplicated, or had a screenshot
-  // added) takes focus, with the cursor at the end of its text.
+  // added) takes focus, scrolled into view, with the cursor at the end of
+  // its text.
   useEffect(() => {
     if (!autoFocus || !textRef.current) return;
     const el = textRef.current;
-    el.focus();
+    rowRef.current?.scrollIntoView({ block: "nearest" });
+    el.focus({ preventScroll: true });
     el.setSelectionRange(el.value.length, el.value.length);
     onFocused();
   }, [autoFocus, onFocused]);
-
-  // A comment left with no text and no screenshot vanishes silently.
-  // Focus moving to this comment's own controls isn't leaving it, and
-  // neither is the panel hiding itself for a screenshot.
-  const onBlur = (event: FocusEvent<HTMLLIElement>) => {
-    if (capturing.current) return;
-    const next = event.relatedTarget as Node | null;
-    if (next && event.currentTarget.contains(next)) return;
-    if (!comment.text.trim() && !comment.screenshot) onLeftEmpty();
-  };
 
   const summary = comment.element && (
     <Text variant="caption" emphasis="low" truncate>
@@ -117,7 +100,7 @@ export function CommentItem({
   );
 
   return (
-    <li className="art-row" onBlur={onBlur}>
+    <li className="art-row" ref={rowRef}>
       {/* The number and the actions share the first row inside the card's
           content, rather than a Card.Header, whose own padding and divider
           make every card much taller. Then the Comment field, then the
@@ -135,10 +118,11 @@ export function CommentItem({
                 {number}
               </Heading>
               <Group gap="rec-sm" wrap="nowrap">
+                {/* Solid when it's there (owner decision). */}
                 {!hasShot && canAddScreenshot && (
                   <Tooltip label="Add screenshot">
                     <Button
-                      variant="outline"
+                      variant="solid"
                       size="small"
                       icon={<Camera />}
                       loading={capturingScreenshot}
@@ -148,41 +132,28 @@ export function CommentItem({
                     />
                   </Tooltip>
                 )}
-                <Menu
-                  trapFocus={false}
-                  opened={menuOpened}
-                  onChange={setMenuOpened}
-                >
-                  <Tooltip label="More actions">
-                    <Menu.Target>
-                      <Button
-                        variant="outline"
-                        size="small"
-                        // An X while the menu is open (owner decision).
-                        icon={menuOpened ? <X /> : <DotsThree />}
-                        ref={menuTriggerRef}
-                        aria-label={`More actions for ${name}`}
-                        data-row-menu={comment.id}
-                      />
-                    </Menu.Target>
-                  </Tooltip>
-                  <Menu.Dropdown onKeyDown={onMenuKeyDown}>
-                    {/* Leading icons are decorative; the text is the name. */}
-                    <Menu.Item
-                      ref={menuFirstItemRef}
-                      leftSection={<Copy aria-hidden />}
-                      onClick={onDuplicate}
-                    >
-                      Duplicate comment
-                    </Menu.Item>
-                    <Menu.Item
-                      leftSection={<Trash aria-hidden />}
-                      onClick={onDelete}
-                    >
-                      Delete comment
-                    </Menu.Item>
-                  </Menu.Dropdown>
-                </Menu>
+                {/* Dedicated buttons instead of a menu (owner decision).
+                    Delete still asks first. */}
+                <Tooltip label="Duplicate comment">
+                  <Button
+                    variant="outline"
+                    size="small"
+                    icon={<Copy />}
+                    aria-label={`Duplicate ${name}`}
+                    data-duplicate={comment.id}
+                    onClick={onDuplicate}
+                  />
+                </Tooltip>
+                <Tooltip label="Delete comment">
+                  <Button
+                    variant="outline"
+                    size="small"
+                    icon={<Trash />}
+                    aria-label={`Delete ${name}`}
+                    data-delete={comment.id}
+                    onClick={onDelete}
+                  />
+                </Tooltip>
               </Group>
             </Group>
             {/* The Comment field carries the kit's own 8px bottom margin
@@ -217,6 +188,18 @@ export function CommentItem({
                   <img
                     className="art-thumb"
                     src={comment.screenshot ?? undefined}
+                    onLoad={(event) =>
+                      setNaturalWidth(
+                        event.currentTarget.naturalWidth /
+                          (comment.screenshotScale ??
+                            (window.devicePixelRatio || 1)),
+                      )
+                    }
+                    // Our own element (no image component): its natural
+                    // width, capped by the frame's width in panel.css.
+                    style={
+                      naturalWidth ? { width: `${naturalWidth}px` } : undefined
+                    }
                     alt={
                       comment.element
                         ? `Screenshot of the element in ${name}`

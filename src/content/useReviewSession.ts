@@ -2,7 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { generateGuid } from "./lib/ids";
 import { renumberComments, saveReviewer, saveSession } from "./lib/storage";
 import type { RecursicaDetection } from "./lib/recursica";
-import type { CapturedElement, ReviewComment, Session } from "./lib/types";
+import type { ReviewComment, Session } from "./lib/types";
+
+// The fields of a comment other than its id and number.
+export type CommentFields = Partial<
+  Omit<ReviewComment, "id" | "commentNumber">
+>;
 
 // Structural changes (a new, deleted or duplicated comment, a capture, a
 // start over) save immediately. Plain typing saves after a pause instead,
@@ -125,20 +130,22 @@ export function useReviewSession({
   // returns its id. Comments are numbered 1 to N across the whole session,
   // in creation order, so a new one is always N + 1 (commentCounter is N).
   const addComment = useCallback(
-    (
-      pageKey: string,
-      text = "",
-      screenshot: string | null = null,
-      element?: CapturedElement,
-    ) => {
+    (pageKey: string, fields: CommentFields = {}) => {
       const base = latest.current ?? newSession();
       const commentNumber = base.commentCounter + 1;
+      // Ids are creation times; never reuse one, even within a millisecond.
+      const lastId = Math.max(
+        0,
+        ...Object.values(base.pages).flatMap((p) =>
+          p.comments.map((c) => c.id),
+        ),
+      );
       const comment: ReviewComment = {
-        id: Date.now(),
+        text: "",
+        screenshot: null,
+        ...fields,
+        id: Math.max(Date.now(), lastId + 1),
         commentNumber,
-        text,
-        screenshot,
-        ...(element ? { element } : {}),
       };
       commit(
         withPageComments(
@@ -153,9 +160,14 @@ export function useReviewSession({
     [commit],
   );
 
+  // A copy of everything but the id and the number.
   const duplicateComment = useCallback(
-    (pageKey: string, source: ReviewComment) =>
-      addComment(pageKey, source.text, source.screenshot, source.element),
+    (pageKey: string, source: ReviewComment) => {
+      const fields: CommentFields = structuredClone(source);
+      delete (fields as Partial<ReviewComment>).id;
+      delete (fields as Partial<ReviewComment>).commentNumber;
+      return addComment(pageKey, fields);
+    },
     [addComment],
   );
 
@@ -163,14 +175,21 @@ export function useReviewSession({
     (
       pageKey: string,
       id: number,
-      patch: Partial<Pick<ReviewComment, "text" | "screenshot">>,
+      // A field set to undefined is removed.
+      patch: CommentFields,
       mode: "now" | "typing",
     ) => {
       const current = latest.current;
       if (!current) return;
       commit(
         withPageComments(current, pageKey, (list) =>
-          list.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+          list.map((c) => {
+            if (c.id !== id) return c;
+            const next: ReviewComment = { ...c, ...patch };
+            for (const [key, value] of Object.entries(patch))
+              if (value === undefined) delete next[key as keyof CommentFields];
+            return next;
+          }),
         ),
         mode,
       );

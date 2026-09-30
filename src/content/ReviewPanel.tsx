@@ -21,7 +21,7 @@ import { DownloadModal, type ReportDetails } from "./components/DownloadModal";
 import { ResizeHandle } from "./components/ResizeHandle";
 import { ViewOptions } from "./components/ViewOptions";
 import { captureElement, captureRegion } from "./lib/capture";
-import { formatCount, plural } from "./lib/format";
+import { plural } from "./lib/format";
 import { commentName } from "./lib/ids";
 import { detectRecursica } from "./lib/recursica";
 import {
@@ -113,7 +113,6 @@ export function ReviewPanel({
   // True while a screenshot is being selected: the panel is hidden, so
   // its text loses focus, and that blur must not clean up the comment the
   // screenshot is for.
-  const capturing = useRef(false);
 
   const pageKey = usePageKey();
   const total = totalCommentCount(session);
@@ -275,7 +274,8 @@ export function ReviewPanel({
   };
 
   // Each Add menu item creates a new comment at the top with focus in its
-  // text box. An empty one vanishes when left, as before.
+  // text box. A comment stays until it is deleted on purpose, even blank
+  // (owner decision).
   const handleAddComment = () => {
     setToast(null);
     setFocusId(review.addComment(pageKey));
@@ -294,7 +294,12 @@ export function ReviewPanel({
       returnFocus(ADD_MENU);
       return;
     }
-    setFocusId(review.addComment(pageKey, "", result.dataUrl));
+    setFocusId(
+      review.addComment(pageKey, {
+        screenshot: result.dataUrl,
+        screenshotScale: result.scale,
+      }),
+    );
     detectPage(pageKey);
   };
 
@@ -308,7 +313,13 @@ export function ReviewPanel({
       returnFocus(ADD_MENU);
       return;
     }
-    setFocusId(review.addComment(pageKey, "", result.dataUrl, result.element));
+    setFocusId(
+      review.addComment(pageKey, {
+        screenshot: result.dataUrl,
+        screenshotScale: result.scale,
+        element: result.element,
+      }),
+    );
     detectPage(pageKey);
   };
 
@@ -317,10 +328,8 @@ export function ReviewPanel({
     comment: ReviewComment,
   ) => {
     setToast(null);
-    capturing.current = true;
     setCaptureTarget(comment.id);
     const result = await captureRegion(host);
-    capturing.current = false;
     setCaptureTarget(null);
     // Cancelled or failed: focus goes back to this row's Add screenshot
     // button, which is still there.
@@ -332,7 +341,7 @@ export function ReviewPanel({
     review.updateComment(
       commentPage,
       comment.id,
-      { screenshot: result.dataUrl },
+      { screenshot: result.dataUrl, screenshotScale: result.scale },
       "now",
     );
     setFocusId(comment.id);
@@ -341,12 +350,14 @@ export function ReviewPanel({
   // From the row menu: focus goes back to the menu's trigger, not into
   // the new comment (the menu rule).
   // A duplicate belongs to the same page as the comment it copies.
+  // The new copy takes focus, scrolled into view, with the caret at the
+  // end of its text (owner decision).
   const handleDuplicate = (commentPage: string, comment: ReviewComment) => {
     setToast(null);
-    review.duplicateComment(commentPage, comment);
+    setFocusId(review.duplicateComment(commentPage, comment));
   };
 
-  // Download comments: save what the reviewer entered (name and email under
+  // Download report: save what the reviewer entered (name and email under
   // their own keys, session details in the session, as before), then build
   // the report from exactly those values.
   const downloadWith = (values: ReportDetails) => {
@@ -372,7 +383,7 @@ export function ReviewPanel({
     const current = confirmation;
     setConfirmation(null);
     if (current?.kind === "delete-comment")
-      returnFocus(`[data-row-menu="${current.comment.id}"]`, ADD_MENU);
+      returnFocus(`[data-delete="${current.comment.id}"]`, ADD_MENU);
     else returnFocus("[data-start-over]", ADD_MENU);
   };
 
@@ -477,7 +488,6 @@ export function ReviewPanel({
               formLayout={formLayout}
               focusId={focusId}
               onFocused={() => setFocusId(null)}
-              capturing={capturing}
               captureTarget={captureTarget}
               onAddScreenshotTo={handleAddScreenshotTo}
               onDuplicate={handleDuplicate}
@@ -498,6 +508,7 @@ export function ReviewPanel({
               }
             />
             <ViewOptions
+              disabled={total === 0}
               pageOnly={pageOnly}
               showImages={showImages}
               onPageOnlyChange={(next) => {
@@ -519,7 +530,12 @@ export function ReviewPanel({
         */}
         {/* Buttons only, no text (owner decision). */}
         <Panel.Footer>
-          <Group justify="space-between" wrap="nowrap" gap="rec-sm" w="100%">
+          {/* The longer label (owner's) doesn't fit beside Start over below
+              about 470px with a large count. Rather than cut the label
+              short, the footer wraps: Start over stays at the left, and
+              Download report moves to its own line at the bottom right,
+              where the primary action goes. */}
+          <Group justify="space-between" wrap="wrap" gap="rec-sm" w="100%">
             {/* The footer's two buttons are the default size; every other
                 button in the panel is small (owner decision). */}
             <Button
@@ -531,24 +547,25 @@ export function ReviewPanel({
               Start over
             </Button>
             {/* The count is every comment in the report, on every page -
-                not only the ones showing. In parentheses after a label
-                that doesn't change, left out at zero; the accessible name
-                spells it out. */}
-            <Button
-              variant="solid"
-              disabled={total === 0}
-              data-download="true"
-              aria-label={
-                total > 0
-                  ? `Download ${plural(total, "comment", "comments")}`
-                  : undefined
-              }
-              onClick={() => setDownloadOpen(true)}
-            >
-              {total > 0
-                ? `Download comments (${formatCount(total)})`
-                : "Download comments"}
-            </Button>
+                not only the ones showing (owner's label). Left out at
+                zero; the accessible name spells it out. */}
+            <Group ml="auto">
+              <Button
+                variant="solid"
+                disabled={total === 0}
+                data-download="true"
+                aria-label={
+                  total > 0
+                    ? `Download report, all ${plural(total, "comment", "comments")}`
+                    : undefined
+                }
+                onClick={() => setDownloadOpen(true)}
+              >
+                {total > 0
+                  ? `Download report (all ${plural(total, "comment", "comments")})`
+                  : "Download report"}
+              </Button>
+            </Group>
           </Group>
         </Panel.Footer>
       </Panel>

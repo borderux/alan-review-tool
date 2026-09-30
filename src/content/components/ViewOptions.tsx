@@ -1,6 +1,8 @@
 import { Checkbox } from "@recursica/adapter-mantine-v8";
 
 interface ViewOptionsProps {
+  // No comments in the session: nothing to filter (owner decision).
+  disabled: boolean;
   pageOnly: boolean;
   showImages: boolean;
   onPageOnlyChange: (pageOnly: boolean) => void;
@@ -20,6 +22,7 @@ const SHOW_IMAGES = "show-images";
 // The group has a visible label ("View"): the checkbox rules require a
 // real group label, and the label rules forbid a visually hidden one.
 export function ViewOptions({
+  disabled,
   pageOnly,
   showImages,
   onPageOnlyChange,
@@ -41,8 +44,16 @@ export function ViewOptions({
         if (nextShowImages !== showImages) onShowImagesChange(nextShowImages);
       }}
     >
-      <Checkbox value={PAGE_ONLY} label="Only view comments for this url" />
-      <Checkbox value={SHOW_IMAGES} label="Show screenshot thumbnails" />
+      <Checkbox
+        value={PAGE_ONLY}
+        label="Only view comments for this url"
+        disabled={disabled}
+      />
+      <Checkbox
+        value={SHOW_IMAGES}
+        label="Show screenshot thumbnails"
+        disabled={disabled}
+      />
     </Checkbox.Group>
   );
 }

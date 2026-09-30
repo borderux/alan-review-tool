@@ -1,4 +1,3 @@
-import type { MutableRefObject } from "react";
 import { Heading, Link, Stack, Text } from "@recursica/adapter-mantine-v8";
 import { pageHref } from "../lib/links";
 import type { ReviewComment } from "../lib/types";
@@ -29,7 +28,6 @@ interface CommentListProps {
   formLayout: FormLayout;
   focusId: number | null;
   onFocused: () => void;
-  capturing: MutableRefObject<boolean>;
   captureTarget: CaptureTarget;
   onAddScreenshotTo: (pageKey: string, comment: ReviewComment) => void;
   onDuplicate: (pageKey: string, comment: ReviewComment) => void;
@@ -55,7 +53,6 @@ export function CommentList({
   formLayout,
   focusId,
   onFocused,
-  capturing,
   captureTarget,
   onAddScreenshotTo,
   onDuplicate,
@@ -80,11 +77,9 @@ export function CommentList({
           capturingScreenshot={captureTarget === comment.id}
           autoFocus={focusId === comment.id}
           onFocused={onFocused}
-          capturing={capturing}
           onTextChange={(text) =>
             review.updateComment(group.pageKey, comment.id, { text }, "typing")
           }
-          onLeftEmpty={() => review.deleteComment(group.pageKey, comment.id)}
           onDelete={() => onRequestDelete(group.pageKey, comment)}
           onDuplicate={() => onDuplicate(group.pageKey, comment)}
           onAddScreenshot={() => onAddScreenshotTo(group.pageKey, comment)}

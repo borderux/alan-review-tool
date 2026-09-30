@@ -13,6 +13,10 @@ export interface ReviewComment {
   // Present only on element comments (added in the element-capture
   // release; optional, so older sessions load unchanged).
   element?: CapturedElement;
+  // The device pixel ratio the screenshot was captured at (added later;
+  // optional). Its pixels divided by this are its natural size in CSS px.
+  // Missing on older comments: the current device pixel ratio is used.
+  screenshotScale?: number;
 }
 
 // An element picked from the page, like the browser's element inspector.

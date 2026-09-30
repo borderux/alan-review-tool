@@ -325,14 +325,15 @@ export function AnnotationEditor({
         Draw on the screenshot to enable Save annotations.
       </span>
       {/* Every button is a direct child of the footer, so the modal's own
-          button gap applies throughout. The kit's modal footer has no
-          place for a rarely used action on the left, so Delete screenshot
-          sits with the others (the spacer that pushed it left was removed
-          in the adapter-workaround audit). */}
+          button gap applies throughout. OWNER-APPROVED EXCEPTION: the rarely
+          used Delete screenshot sits at the bottom left, pushed apart from
+          Cancel and Save by a flexible spacer - the kit's modal footer has
+          no slot for a rarely used action on the left (a reported gap). */}
       <Modal.Footer>
         <Button variant="text" onClick={() => ask("delete")}>
           Delete screenshot
         </Button>
+        <Group flex={1} aria-hidden />
         <Button variant="outline" onClick={requestClose}>
           Cancel
         </Button>
