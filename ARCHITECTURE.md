@@ -39,11 +39,12 @@ Recursica design system and bundled by Vite into one content script;
     failed-load state (storage could not be read: the panel opens empty,
     Add disabled, with a message in its body).
   - `components/` - the one view (`CommentList`: the current page's
-    comments, or every page's grouped under page headings), the View menu
-    (`ViewMenu`: an icon-only button in the header before Close, with two
-    checkable items, This page only and Show images), the Add menu (`AddMenu`: a small icon-only plus button in
+    comments, or every page's grouped under page headings), the view
+    options (`ViewOptions`: a checkbox group, "Only view comments for this
+    url" and "Show screenshot thumbnails", in the pinned footer above its
+    buttons), the Add menu (`AddMenu`: a small icon-only plus button in
     the panel header, left of the title, rendered into a slot placed first
-    in the header - Comment, Screenshot, Element; both header menus are
+    in the header - Comment, Screenshot, Element; the menu is
     rendered into slots placed in the header, see Adapter workarounds), a
     comment card
     (`CommentItem`, the kit's Card) with its action menu, the download
@@ -225,8 +226,7 @@ Kept, (B) adapter defect or gap that would otherwise break a MUST rule, accessib
 - `ReviewPanel.tsx` Escape handler judged by `event.target`, `AnnotationEditor.tsx` `closeOnEscape` toggled - every open Mantine modal closes on any Escape (a window listener), so Escape in the pen list or on a stacked question would throw the drawing away.
 - `App.tsx` `Tooltip.extend` focus events - tooltips must show on keyboard focus (MUST); the adapter keeps Mantine's hover-only default.
 - `ReviewPanel.tsx` toast live region wrapper and `role="group"` on Toast - the live region must exist before the message (MUST); the Toast's own role would announce twice.
-- `ReviewPanel.tsx` header slots (`.art-header-slot`) for Add and View - Panel has no header actions slot, and its compound parts carry none of its styling; a button inside the title would rename the panel "Add Snippy View".
-- `ViewMenu.tsx` role set to `menuitemcheckbox` - Menu.Item forces `role="menuitem"`, so a checked state can't be exposed; "a selected item's state must be available in code" (MUST).
+- `ReviewPanel.tsx` header slot (`.art-header-slot`) for Add - Panel has no header actions slot, and its compound parts carry none of its styling; a button inside the title would rename the panel "Add Snippy".
 - `ReviewPanel.tsx` `overStyled` + `size` on Panel, `ResizeHandle.tsx`, `panel.css` `.art-resizer` - Panel has no width or resize option; the owner requires a 400-720 px resizable panel, default 440.
 - `vite.config.mts` theme CSS alias - `recursica_variables_scoped.css` is not in the package's `exports`; without the alias the build can't import it.
 
@@ -234,14 +234,20 @@ Kept, our own elements that no component covers (tokens only, owner-requested):
 
 - `panel.css` `.art-shot-frame` (the bordered frame around a comment's image; no image component), `.art-thumb` (image scales to the frame), `.art-shot-well` / `.art-shot-scroll` (the editor's bordered, scrolling image area), `.art-shot` canvases (drawing), `.art-swatch` (pen colours are baked into screenshots, so fixed), `.art-sr-only` (no visually-hidden utility), `.art-list` (reset for the list semantics a card set needs).
 
-Removed in round 10 (the UI now shows the adapter's real behaviour):
+Adapter gaps with no workaround (the UI shows the kit's real behaviour):
+
+- `Card` padding is a fixed 24 px (`--recursica_ui-kit_components_card_properties_padding`, `general_xl`); the card has no size or density option, and `padding` is stripped.
+- `Panel` body padding is a fixed 24 px left and right, 16 px top and bottom (`content-horizontal-padding`, `content-vertical-padding`); no prop changes it. With the card's 2 px border and 24 px padding, a comment's text box starts 51 px in from the panel edge.
+- The panel title's glyphs sit off the centre of their line box (the theme's header type: Dongle at 56 px with a 39.2 px line height), so the title can look off-centre beside the header's buttons, although every header item's box shares one centre line.
+
+Removed in rounds 10 and 11 (the UI now shows the adapter's real behaviour):
 
 - `.art-toast-anchor` - the toast's hand-set bottom-left position. The kit's Toast has no placement, so the toast now shows at the top-left of the viewport.
 - `.art-thumb` 320 px height cap - a tall screenshot now shows at full height.
 - The spacer in the annotation editor's footer - the modal footer has no left-hand slot, so Delete screenshot now sits with Cancel and Save.
 - `maw={560}` on the confirmation text - the text now runs the modal's full width.
 - The footer's wrap wrapper (`ml="auto"`) - not needed at the 400 px minimum.
-- The switch row's slot and styles (the switches moved into the View menu).
+- The switch row's slot and styles (round 10), then the View menu and its `menuitemcheckbox` role fix (round 11: the view options became checkboxes in the kit's pinned footer, which needs no workaround).
 
 ## Data model
 
@@ -275,8 +281,8 @@ session = {
 
 The types live in `src/content/lib/types.ts`. Reviewer identity
 (`snippyUser`, `snippyEmail`), the panel's width (`snippyPanelWidth`) and
-the annotation pen's last colour (`snippyPenColor`) and the two View menu
-options (`snippyPageOnly`, `snippyShowImages`, both on unless stored as
+the annotation pen's last colour (`snippyPenColor`) and the two view
+checkboxes (`snippyPageOnly`, `snippyShowImages`, both on unless stored as
 `false`) are stored under **separate** keys and never cleared by "Start
 over" - they're
 identity/preference facts, not session data. The download modal edits

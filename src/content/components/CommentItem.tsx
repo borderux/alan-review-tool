@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { FocusEvent, MutableRefObject } from "react";
-import { Camera, DotsThree } from "@phosphor-icons/react";
+import { Camera, Copy, DotsThree, Trash } from "@phosphor-icons/react";
 import {
   Button,
   Card,
@@ -118,14 +118,15 @@ export function CommentItem({
 
   return (
     <li className="art-row" onBlur={onBlur}>
-      {/* Compact by design: the number and the actions share the first
-          row inside the card's content, rather than a Card.Header, whose
-          own padding and divider make every card much taller. The
-          theme's smallest gap separates the parts. The card's own padding
-          is fixed by the kit (no size or density option - a reported gap). */}
+      {/* The number and the actions share the first row inside the card's
+          content, rather than a Card.Header, whose own padding and divider
+          make every card much taller. Then the Comment field, then the
+          screenshot or element beneath it. The parts are spaced by the
+          theme's md gap (12px). The card's own padding is fixed by the kit
+          (no size or density option - a reported gap). */}
       <Card>
         <Card.Content>
-          <Stack gap="rec-sm">
+          <Stack gap="rec-md">
             <Group justify="space-between" wrap="nowrap" gap="rec-sm">
               <Heading
                 order={headingOrder}
@@ -165,15 +166,42 @@ export function CommentItem({
                     </Menu.Target>
                   </Tooltip>
                   <Menu.Dropdown onKeyDown={onMenuKeyDown}>
-                    <Menu.Item ref={menuFirstItemRef} onClick={onDuplicate}>
+                    {/* Leading icons are decorative; the text is the name. */}
+                    <Menu.Item
+                      ref={menuFirstItemRef}
+                      leftSection={<Copy aria-hidden />}
+                      onClick={onDuplicate}
+                    >
                       Duplicate comment
                     </Menu.Item>
-                    <Menu.Item onClick={onDelete}>Delete comment</Menu.Item>
+                    <Menu.Item
+                      leftSection={<Trash aria-hidden />}
+                      onClick={onDelete}
+                    >
+                      Delete comment
+                    </Menu.Item>
                   </Menu.Dropdown>
                 </Menu>
               </Group>
             </Group>
-            {/* The supporting material, framed on its own: the image, a
+            <TextArea
+              ref={textRef}
+              label="Comment"
+              {...fieldLayout(formLayout)}
+              autosize
+              minRows={1}
+              placeholder={
+                comment.element
+                  ? "Describe the change or feedback for this element"
+                  : hasShot
+                    ? "Describe the change or feedback for this screenshot"
+                    : "Describe the change or feedback"
+              }
+              value={comment.text}
+              onChange={(event) => onTextChange(event.currentTarget.value)}
+            />
+
+            {/* Below the Comment field, the supporting material, framed on its own: the image, a
                 short summary for an element, and the button that acts on
                 the image. The full selector, HTML and styles are in the
                 report. With images hidden there is no frame: the summary
@@ -194,29 +222,12 @@ export function CommentItem({
               </div>
             )}
             {hasShot && !showImages && (
-              <Stack gap="rec-sm" align="flex-start">
+              <Stack gap="rec-md" align="flex-start">
                 {summary}
                 {annotate}
               </Stack>
             )}
             {!hasShot && summary}
-
-            <TextArea
-              ref={textRef}
-              label="Comment"
-              {...fieldLayout(formLayout)}
-              autosize
-              minRows={1}
-              placeholder={
-                comment.element
-                  ? "Describe the change or feedback for this element"
-                  : hasShot
-                    ? "Describe the change or feedback for this screenshot"
-                    : "Describe the change or feedback"
-              }
-              value={comment.text}
-              onChange={(event) => onTextChange(event.currentTarget.value)}
-            />
           </Stack>
         </Card.Content>
       </Card>

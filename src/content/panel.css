@@ -44,9 +44,9 @@
   z-index: 1001;
 }
 
-/* The two slots in the panel header that hold the Add menu (before the
-   title) and the View menu (before Close) - an adapter gap: Panel has no
-   header actions slot. The header's own gap spaces them. */
+/* The slot at the start of the panel header that holds the Add menu,
+   before the title - an adapter gap: Panel has no header actions slot.
+   The header's own gap spaces it from the title. */
 .art-header-slot {
   display: flex;
   align-items: center;
@@ -64,7 +64,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--recursica_brand_dimensions_general_sm);
+  gap: var(--recursica_brand_dimensions_general_md);
   /* Exactly the width of the Comment text box beneath it, at every panel
      width: the full content width, up to the same token that caps the
      stacked text box (so on a wide panel both stop at that width). */

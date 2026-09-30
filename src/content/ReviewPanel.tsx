@@ -5,6 +5,7 @@ import {
   Button,
   Group,
   Panel,
+  Stack,
   Text,
   Toast,
 } from "@recursica/adapter-mantine-v8";
@@ -18,7 +19,7 @@ import {
 import { ConfirmModal } from "./components/ConfirmModal";
 import { DownloadModal, type ReportDetails } from "./components/DownloadModal";
 import { ResizeHandle } from "./components/ResizeHandle";
-import { ViewMenu } from "./components/ViewMenu";
+import { ViewOptions } from "./components/ViewOptions";
 import { captureElement, captureRegion } from "./lib/capture";
 import { formatCount, plural } from "./lib/format";
 import { commentName } from "./lib/ids";
@@ -102,9 +103,6 @@ export function ReviewPanel({
   // Where the Add menu renders: a slot at the start of the panel header,
   // before the title (see below).
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
-  // Where the View menu renders: a slot in the header between the title
-  // and the close button (see below).
-  const [viewSlot, setViewSlot] = useState<HTMLElement | null>(null);
   const [pageOnly, setPageOnly] = useState(stored.pageOnly);
   const [showImages, setShowImages] = useState(stored.showImages);
   const loadFailed = Boolean(stored.loadFailed);
@@ -169,28 +167,20 @@ export function ReviewPanel({
   // Workaround (adapter gap): the kit's panel header has a title and a
   // close button and no slot for actions, and its compound parts
   // (Panel.Header, Panel.Title) carry none of the panel's styling, so a
-  // custom header can't be composed either. Putting buttons inside the
-  // title would make the panel's accessible name "Add Snippy View". So two
-  // slot elements are placed in the header - one first, for the Add menu,
-  // and one just before the close button, for the View menu - and the
-  // menus are rendered into them. Header order: Add, title, View, Close.
+  // custom header can't be composed either. Putting the button inside the
+  // title would make the panel's accessible name "Add Snippy". So a slot
+  // element is placed first in the header and the Add menu is rendered
+  // into it. Header order: Add, title, Close.
   useEffect(() => {
     const header = findInPanel(host, ".mantine-Drawer-header");
     if (!header) return;
-    const start = document.createElement("div");
-    start.className = "art-header-slot";
-    header.prepend(start);
-    const end = document.createElement("div");
-    end.className = "art-header-slot";
-    header.insertBefore(end, header.querySelector(".mantine-Drawer-close"));
-    const frame = requestAnimationFrame(() => {
-      setHeaderSlot(start);
-      setViewSlot(end);
-    });
+    const slot = document.createElement("div");
+    slot.className = "art-header-slot";
+    header.prepend(slot);
+    const frame = requestAnimationFrame(() => setHeaderSlot(slot));
     return () => {
       cancelAnimationFrame(frame);
-      start.remove();
-      end.remove();
+      slot.remove();
     };
   }, [host]);
 
@@ -508,38 +498,57 @@ export function ReviewPanel({
           as a toast.
         */}
         {/* Buttons only, no text (owner decision). */}
+        {/* The kit's footer is pinned to the bottom of the panel, so the
+            view options sit in it, directly above the buttons, and never
+            scroll with the list. */}
         <Panel.Footer>
-          <Group justify="space-between" wrap="nowrap" gap="rec-sm" w="100%">
-            {/* The footer's two buttons are the default size; every other
+          <Stack gap="rec-md" w="100%">
+            {!loadFailed && (
+              <ViewOptions
+                pageOnly={pageOnly}
+                showImages={showImages}
+                onPageOnlyChange={(next) => {
+                  setPageOnly(next);
+                  review.track(savePageOnly(next));
+                }}
+                onShowImagesChange={(next) => {
+                  setShowImages(next);
+                  review.track(saveShowImages(next));
+                }}
+              />
+            )}
+            <Group justify="space-between" wrap="nowrap" gap="rec-sm" w="100%">
+              {/* The footer's two buttons are the default size; every other
                 button in the panel is small (owner decision). */}
-            <Button
-              variant="text"
-              disabled={!session}
-              data-start-over="true"
-              onClick={() => setConfirmation({ kind: "start-over" })}
-            >
-              Start over
-            </Button>
-            {/* The count is every comment in the report, on every page -
+              <Button
+                variant="text"
+                disabled={!session}
+                data-start-over="true"
+                onClick={() => setConfirmation({ kind: "start-over" })}
+              >
+                Start over
+              </Button>
+              {/* The count is every comment in the report, on every page -
                 not only the ones showing. In parentheses after a label
                 that doesn't change, left out at zero; the accessible name
                 spells it out. */}
-            <Button
-              variant="solid"
-              disabled={total === 0}
-              data-download="true"
-              aria-label={
-                total > 0
-                  ? `Download ${plural(total, "comment", "comments")}`
-                  : undefined
-              }
-              onClick={() => setDownloadOpen(true)}
-            >
-              {total > 0
-                ? `Download comments (${formatCount(total)})`
-                : "Download comments"}
-            </Button>
-          </Group>
+              <Button
+                variant="solid"
+                disabled={total === 0}
+                data-download="true"
+                aria-label={
+                  total > 0
+                    ? `Download ${plural(total, "comment", "comments")}`
+                    : undefined
+                }
+                onClick={() => setDownloadOpen(true)}
+              >
+                {total > 0
+                  ? `Download comments (${formatCount(total)})`
+                  : "Download comments"}
+              </Button>
+            </Group>
+          </Stack>
         </Panel.Footer>
       </Panel>
 
@@ -580,23 +589,6 @@ export function ReviewPanel({
         onCancel={cancelConfirmation}
         onConfirm={confirm}
       />
-      {viewSlot &&
-        !loadFailed &&
-        createPortal(
-          <ViewMenu
-            pageOnly={pageOnly}
-            showImages={showImages}
-            onPageOnlyChange={(next) => {
-              setPageOnly(next);
-              review.track(savePageOnly(next));
-            }}
-            onShowImagesChange={(next) => {
-              setShowImages(next);
-              review.track(saveShowImages(next));
-            }}
-          />,
-          viewSlot,
-        )}
       {headerSlot &&
         createPortal(
           <AddMenu

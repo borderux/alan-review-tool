@@ -62,7 +62,7 @@ export function CommentList({
   onAnnotate,
 }: CommentListProps) {
   const list = (group: PageGroup, label: string) => (
-    <Stack component="ol" className="art-list" aria-label={label} gap="rec-sm">
+    <Stack component="ol" className="art-list" aria-label={label} gap="rec-lg">
       {group.comments.map((comment) => (
         <CommentItem
           key={comment.id}
@@ -91,12 +91,21 @@ export function CommentList({
   const visible = groups.filter((g) => g.comments.length > 0);
   if (visible.length === 0) return null;
 
-  if (!grouped) return list(visible[0], "Comments on this page");
+  // The list ends with space of its own (a spacing token, as its bottom
+  // margin), so when scrolled to the end the last card clears the pinned
+  // footer: the panel body's own bottom padding sits below the footer,
+  // not above it.
+  if (!grouped)
+    return (
+      <Stack gap="rec-none" mb="rec-lg">
+        {list(visible[0], "Comments on this page")}
+      </Stack>
+    );
 
   return (
-    <Stack gap="rec-lg">
+    <Stack gap="rec-xl" mb="rec-lg">
       {visible.map((group) => (
-        <Stack key={group.pageKey} gap="rec-sm" component="section">
+        <Stack key={group.pageKey} gap="rec-lg" component="section">
           <Stack gap="rec-none">
             <Heading order={3}>
               {group.title || shortUrl(group.pageKey)}

@@ -15,11 +15,12 @@ JavaScript in what you export.
 - **One Add menu** — the plus button in the panel header offers Comment,
   Screenshot or Element. Each creates a new numbered comment card at the
   top of the list, with focus in its text box.
-- **This page only, or every page** — the View menu in the panel header
-  has two options. This page only (on by default) shows just the current
-  page's comments; off, it shows every page's, grouped under page
-  headings. Show images (on by default) can hide the screenshots in the
-  panel (never in the report). Both are remembered.
+- **This page only, or every page** — two checkboxes above the footer
+  buttons. "Only view comments for this url" (checked by default) shows
+  just the current page's comments; unchecked, it shows every page's,
+  grouped under page headings. "Show screenshot thumbnails" (checked by
+  default) can hide the screenshots in the panel (never in the report).
+  Both are remembered.
 - **Screenshot capture with freehand annotation** — drag-select any region
   of the page, then use Add annotations to draw on it, choosing one of six
   pen colors from a dropdown (red by default; the last choice is
