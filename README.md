@@ -91,6 +91,42 @@ browser manifests and the panel, and fails if they would differ.
 See [ARCHITECTURE.md](ARCHITECTURE.md) for how all of this fits together,
 and [llms.txt](llms.txt) for a quick map of the repo's layout.
 
+## Privacy
+
+Snippy has no backend and no analytics, and it sends nothing anywhere. The
+only network read it makes is re-reading the reviewed page's own stylesheets
+(same origin) to detect the Recursica version. A review session lives in the
+browser's local extension storage on your machine until you delete it with
+Start over or remove the extension. The reviewer name and email you enter are
+kept separately and are not cleared by Start over.
+
+What a session, and so the report you download, contains:
+
+- your comment text, and the page address (including any query string and
+  fragment) and title of every page you commented on
+- screenshots, and the annotations drawn on them, in two versions when a
+  screenshot is annotated: the original and the marked-up one
+- for an element comment: its selector, its HTML with descendants, key
+  computed styles and the viewport size. Typed values in form fields, editable
+  content, script contents and inline event handlers are removed, but **visible
+  text is kept**
+- the reviewer name, email and session details you type into the download
+  dialog
+- environment details so a developer can reproduce what you saw: browser and
+  version, operating system, language, time zone, screen and viewport size,
+  pixel ratio, zoom, scroll position and light or dark preference
+- whether the page looks like it was built with Recursica, read from the
+  page's own stylesheets (same origin only)
+
+Snippy deliberately does not capture IP addresses, cookies, other storage,
+installed extensions, fonts or plugins, or any other page content.
+
+**Review a report before you share it.** Screenshots and captured element HTML
+show whatever was on the page, including names, account details or other
+confidential data, and page addresses can carry ids or tokens in their query
+string. The report is one self-contained HTML file with everything above
+embedded, so whoever receives it sees all of it.
+
 ## Supported screens
 
 Desktop browsers only. The panel is designed for a desktop window and has
