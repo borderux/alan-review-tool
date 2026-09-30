@@ -45,11 +45,12 @@ export const PEN_COLORS = [
 export type PenColor = (typeof PEN_COLORS)[number];
 export const DEFAULT_PEN_COLOR: PenColor = "red";
 
-// The owner approved this range (336-720, default 360) with the resize
-// strip; a stored width below the minimum is clamped up. (The minimum was
-// first raised from 240px when the panel had tabs; it stayed when they went.)
-export const DEFAULT_WIDTH = 360;
-export const MIN_WIDTH = 336;
+// The owner approved this range (400-720, default 440) with the resize
+// strip; a stored width below the minimum is raised to it on load. (The
+// minimum was 336 and the default 360 until the owner widened the panel.)
+// 720 stays inside the kit's panel max-width token (960px).
+export const DEFAULT_WIDTH = 440;
+export const MIN_WIDTH = 400;
 export const MAX_WIDTH = 720;
 
 export const clamp = (value: number, min: number, max: number): number =>

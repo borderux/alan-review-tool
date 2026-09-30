@@ -44,8 +44,9 @@
   z-index: 1001;
 }
 
-/* The slot at the start of the panel header that holds the Add menu, to
-   the left of the title. The header's own gap spaces it from the title. */
+/* The two slots in the panel header that hold the Add menu (before the
+   title) and the View menu (before Close) - an adapter gap: Panel has no
+   header actions slot. The header's own gap spaces them. */
 .art-header-slot {
   display: flex;
   align-items: center;
@@ -63,7 +64,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--recursica_brand_dimensions_general_md);
+  gap: var(--recursica_brand_dimensions_general_sm);
   /* Exactly the width of the Comment text box beneath it, at every panel
      width: the full content width, up to the same token that caps the
      stacked text box (so on a wide panel both stop at that width). */
@@ -73,21 +74,19 @@
     --recursica_ui-kit_components_textarea_variants_layouts_stacked_properties_max-width
   );
   box-sizing: border-box;
-  padding: var(--recursica_brand_dimensions_general_lg);
+  /* The theme's smallest spacing, to keep the card compact. */
+  padding: var(--recursica_brand_dimensions_general_sm);
   border: var(--recursica_ui-kit_components_panel_properties_border-size) solid
     var(--recursica_ui-kit_components_panel_properties_colors_border-color);
   border-radius: var(--recursica_brand_dimensions_border-radii_default);
 }
 /* The image scales to the frame's width, keeping its aspect ratio - never
-   stretched or cropped. A very tall one stops at the max height and is
-   letterboxed, so it can't push the rest of the list far down. */
+   stretched or cropped. (Its hand-set 320px height cap was removed in the
+   adapter-workaround audit: a tall image now shows at full height.) */
 .art-thumb {
   display: block;
   width: 100%;
   height: auto;
-  max-height: 320px;
-  object-fit: contain;
-  object-position: left top;
 }
 
 /* The comment list: one card per comment (the kit's Card), so the cards
@@ -97,31 +96,6 @@
   list-style: none;
   margin: 0;
   padding: 0;
-}
-
-/* The view switches (This page only, Show images), pinned between the
-   panel header and its scrolling body, so they stay put while the list
-   scrolls. The kit's panel has no slot for a pinned toolbar, so this slot
-   is placed there and the switches are rendered into it (a reported gap).
-   Its padding and bottom divider are the panel body's own padding and
-   divider tokens, so it lines up with the list below. */
-.art-view-slot {
-  flex-shrink: 0;
-  padding: var(
-      --recursica_ui-kit_components_panel_properties_content-vertical-padding
-    )
-    var(
-      --recursica_ui-kit_components_panel_properties_content-horizontal-padding
-    );
-  border-bottom: var(
-      --recursica_ui-kit_components_panel_properties_divider-size
-    )
-    solid
-    var(--recursica_ui-kit_components_panel_properties_colors_divider-color);
-}
-/* Nothing to show (saved data could not be loaded): no empty strip. */
-.art-view-slot:empty {
-  display: none;
 }
 
 /* The annotation editor's image area: the only part of the editor that
@@ -195,21 +169,10 @@
    swatches visible on either theme. */
 .art-swatch {
   display: inline-block;
-  width: 16px;
-  height: 16px;
+  width: var(--recursica_tokens_sizes_2x);
+  height: var(--recursica_tokens_sizes_2x);
   border-radius: 50%;
-  border: var(--recursica_brand_layer_1_properties_border-size, 1px) solid
+  border: var(--recursica_brand_layer_1_properties_border-size) solid
     var(--recursica_brand_layer_1_properties_border-color);
   vertical-align: middle;
-}
-
-/* Where a toast appears: over the page, at its bottom-left, so it never
-   changes the height of anything. Not inside the panel: the theme's toast
-   min-width (384px) is wider than the panel itself. The kit's Toast has
-   no host or placement of its own; the offsets come from the theme's
-   spacing token rather than a hand-set value. */
-.art-toast-anchor {
-  position: fixed;
-  left: var(--recursica_brand_dimensions_general_xl);
-  bottom: var(--recursica_brand_dimensions_general_xl);
 }

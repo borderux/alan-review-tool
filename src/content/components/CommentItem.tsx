@@ -118,58 +118,61 @@ export function CommentItem({
 
   return (
     <li className="art-row" onBlur={onBlur}>
+      {/* Compact by design: the number and the actions share the first
+          row inside the card's content, rather than a Card.Header, whose
+          own padding and divider make every card much taller. The
+          theme's smallest gap separates the parts. The card's own padding
+          is fixed by the kit (no size or density option - a reported gap). */}
       <Card>
-        <Card.Header>
-          <Group justify="space-between" wrap="nowrap" gap="rec-sm">
-            <Heading
-              order={headingOrder}
-              aria-label={commentName(comment.commentNumber, true)}
-            >
-              {number}
-            </Heading>
-            <Group gap="rec-sm" wrap="nowrap">
-              {!hasShot && canAddScreenshot && (
-                <Tooltip label="Add screenshot">
-                  <Button
-                    variant="outline"
-                    size="small"
-                    icon={<Camera />}
-                    loading={capturingScreenshot}
-                    aria-label={`Add screenshot to ${name}`}
-                    data-shot-add={comment.id}
-                    onClick={onAddScreenshot}
-                  />
-                </Tooltip>
-              )}
-              <Menu
-                trapFocus={false}
-                opened={menuOpened}
-                onChange={setMenuOpened}
+        <Card.Content>
+          <Stack gap="rec-sm">
+            <Group justify="space-between" wrap="nowrap" gap="rec-sm">
+              <Heading
+                order={headingOrder}
+                aria-label={commentName(comment.commentNumber, true)}
               >
-                <Tooltip label="More actions">
-                  <Menu.Target>
+                {number}
+              </Heading>
+              <Group gap="rec-sm" wrap="nowrap">
+                {!hasShot && canAddScreenshot && (
+                  <Tooltip label="Add screenshot">
                     <Button
                       variant="outline"
                       size="small"
-                      icon={<DotsThree />}
-                      ref={menuTriggerRef}
-                      aria-label={`More actions for ${name}`}
-                      data-row-menu={comment.id}
+                      icon={<Camera />}
+                      loading={capturingScreenshot}
+                      aria-label={`Add screenshot to ${name}`}
+                      data-shot-add={comment.id}
+                      onClick={onAddScreenshot}
                     />
-                  </Menu.Target>
-                </Tooltip>
-                <Menu.Dropdown onKeyDown={onMenuKeyDown}>
-                  <Menu.Item ref={menuFirstItemRef} onClick={onDuplicate}>
-                    Duplicate comment
-                  </Menu.Item>
-                  <Menu.Item onClick={onDelete}>Delete comment</Menu.Item>
-                </Menu.Dropdown>
-              </Menu>
+                  </Tooltip>
+                )}
+                <Menu
+                  trapFocus={false}
+                  opened={menuOpened}
+                  onChange={setMenuOpened}
+                >
+                  <Tooltip label="More actions">
+                    <Menu.Target>
+                      <Button
+                        variant="outline"
+                        size="small"
+                        icon={<DotsThree />}
+                        ref={menuTriggerRef}
+                        aria-label={`More actions for ${name}`}
+                        data-row-menu={comment.id}
+                      />
+                    </Menu.Target>
+                  </Tooltip>
+                  <Menu.Dropdown onKeyDown={onMenuKeyDown}>
+                    <Menu.Item ref={menuFirstItemRef} onClick={onDuplicate}>
+                      Duplicate comment
+                    </Menu.Item>
+                    <Menu.Item onClick={onDelete}>Delete comment</Menu.Item>
+                  </Menu.Dropdown>
+                </Menu>
+              </Group>
             </Group>
-          </Group>
-        </Card.Header>
-        <Card.Content>
-          <Stack gap="rec-lg">
             {/* The supporting material, framed on its own: the image, a
                 short summary for an element, and the button that acts on
                 the image. The full selector, HTML and styles are in the
@@ -191,7 +194,7 @@ export function CommentItem({
               </div>
             )}
             {hasShot && !showImages && (
-              <Stack gap="rec-md" align="flex-start">
+              <Stack gap="rec-sm" align="flex-start">
                 {summary}
                 {annotate}
               </Stack>

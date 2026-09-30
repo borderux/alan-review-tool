@@ -24,6 +24,12 @@ assume none of that is obvious from a local diff alone.
   `overStyled` escape hatch is used exactly once (the panel's
   user-resizable width, an approved exception) - any new use needs a
   stated reason and a reported design-system gap
+- **Don't paper over the adapter.** If a Recursica component misbehaves,
+  that is an adapter bug: report it and let the UI show the real
+  behaviour. A workaround is kept only when running in a shadow root
+  forces it, or when removing it would break accessibility, usability or
+  a MUST rule in the Recursica skills. Every kept one is listed in
+  ARCHITECTURE.md's "Adapter workarounds", with the bug it stands in for
 - Everything the panel draws lives in a shadow root. Don't write to the
   host page's `<html>` or `<body>` beyond what ARCHITECTURE.md lists (the
   page push, the dataset flags, and the registered fonts) - the host page

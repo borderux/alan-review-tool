@@ -39,12 +39,13 @@ Recursica design system and bundled by Vite into one content script;
     failed-load state (storage could not be read: the panel opens empty,
     Add disabled, with a message in its body).
   - `components/` - the one view (`CommentList`: the current page's
-    comments, or every page's grouped under page headings), the view
-    switches (`ViewControls`: This page only, Show images - rendered into
-    a slot placed between the panel header and its scrolling body, so they
-    stay put), the Add menu (`AddMenu`: a small icon-only plus button in
+    comments, or every page's grouped under page headings), the View menu
+    (`ViewMenu`: an icon-only button in the header before Close, with two
+    checkable items, This page only and Show images), the Add menu (`AddMenu`: a small icon-only plus button in
     the panel header, left of the title, rendered into a slot placed first
-    in the header - Comment, Screenshot, Element), a comment card
+    in the header - Comment, Screenshot, Element; both header menus are
+    rendered into slots placed in the header, see Adapter workarounds), a
+    comment card
     (`CommentItem`, the kit's Card) with its action menu, the download
     modal (reviewer name, email and session details, every time comments
     are downloaded), the annotation editor (a fixed toolbar with the pen
@@ -189,6 +190,59 @@ Because every stylesheet is inlined, `content.js` is large (about 2 MB,
 most of it the theme's CSS variables). It is read from the local
 extension package on each click, never downloaded.
 
+## Adapter workarounds
+
+Owner policy: when the adapter or theme misbehaves, that is an adapter bug,
+and the UI shows the adapter's real behaviour. A workaround stays only if
+the panel is **(A)** forced to it by running in a shadow root on someone
+else's page, or **(B)** would otherwise be unusable, inaccessible, or break
+a MUST rule in the Recursica skills. Everything purely cosmetic of our own
+**(C)** uses kit props and tokens or goes. Each kept item is reported to the
+adapter. Audited in round 10; keep this list current.
+
+Kept, (A) shadow root / someone else's page:
+
+- `vite.config.mts` `shadowScope` - `:root` rewritten to `.art-root`: theme and Mantine variables never match inside a shadow root. Ask: ship the theme scoped to a selector the consumer chooses.
+- `vite.config.mts` `shadowScope` - bare `rem` in the adapter and theme CSS converted to px: `rem` follows the host page's root font. Ask: no bare `rem`, or scale it like Mantine does.
+- `App.tsx` `scale: pageRemScale()` - Mantine's scale set from the host's root font, for the same reason.
+- `App.tsx` `cssVariablesSelector`, `getRootElement`; `mount.tsx`/`useColorScheme.ts` `data-recursica-theme` on the panel root - `RecursicaThemeProvider` writes to the host's `<html>`. Ask: a provider that targets a given element.
+- `App.tsx` `Portal.extend` target, `panel.css` `.art-portal` - portals must stay inside the shadow root, and Mantine's modal assumes a viewport-pinned container. Ask: a documented portal target on every overlay component.
+- `mount.tsx` modal portal with `data-recursica-layer="1"` - every modal sits on layer 1; the adapter's `Layer` paints a padded surface, so a plain element carries the attribute. Ask: Modal should set its own layer, or `Layer` should have a surface-less mode.
+- `AnnotationEditor.tsx` `comboboxProps.portalProps` - the pen list renders with the modal (layer 1), not in the inert layer-0 portal. Follows from the two above.
+- `ReviewPanel.tsx` `withinPortal={false}`, `returnFocus={false}` on Panel and modals, and `returnFocus()` - Mantine records `document.activeElement`, which is the shadow host. Ask: focus return that works in a shadow root.
+- `useManagedMenu.ts` - menu focus into the first item and back to the trigger, done by hand for the same reason; Tab closes the menu.
+- `fonts.ts` - the theme's typefaces added to `document.fonts` from bytes: `@font-face` is ignored in a shadow root and a page's CSP can block font requests. Ask: document this for embedded use.
+- `mount.tsx` host element inline styles (`all: initial`, fixed, top z-index) - isolates the panel from the host page's CSS.
+- `panel.css` `.art-root` font-family - the shadow tree inherits `all: initial`, so the base font comes from the brand token.
+- `vite.config.mts` `process.env.NODE_ENV` define - the adapter reads `process` at runtime; a content script has none. Ask: no runtime `process` access.
+- `lib/capture.ts`, `lib/element.ts`, `lib/captureFrame.ts` overlay inline styles and colours - they live in the host page's light DOM, where no token reaches (approved hand-built surface).
+
+Kept, (B) adapter defect or gap that would otherwise break a MUST rule, accessibility or usability:
+
+- `ReviewPanel.tsx` Panel `withOverlay`, `trapFocus`, `lockScroll`, `closeOnEscape`, `closeOnClickOutside` all false - the adapter's Panel keeps Mantine Drawer's modal defaults; the panel rules say a panel is never modal (MUST).
+- `lib/page.ts` `markPanelNonModal` - Panel always renders `role="dialog" aria-modal="true"`, which hides the live page from screen readers.
+- `lib/page.ts` `makeBehindModalInert`, `AnnotationEditor.tsx` editor made inert under its questions - "everything behind the modal must be inert" (MUST); inside a shadow root Mantine's modal doesn't do it.
+- `ReviewPanel.tsx` Escape handler judged by `event.target`, `AnnotationEditor.tsx` `closeOnEscape` toggled - every open Mantine modal closes on any Escape (a window listener), so Escape in the pen list or on a stacked question would throw the drawing away.
+- `App.tsx` `Tooltip.extend` focus events - tooltips must show on keyboard focus (MUST); the adapter keeps Mantine's hover-only default.
+- `ReviewPanel.tsx` toast live region wrapper and `role="group"` on Toast - the live region must exist before the message (MUST); the Toast's own role would announce twice.
+- `ReviewPanel.tsx` header slots (`.art-header-slot`) for Add and View - Panel has no header actions slot, and its compound parts carry none of its styling; a button inside the title would rename the panel "Add Snippy View".
+- `ViewMenu.tsx` role set to `menuitemcheckbox` - Menu.Item forces `role="menuitem"`, so a checked state can't be exposed; "a selected item's state must be available in code" (MUST).
+- `ReviewPanel.tsx` `overStyled` + `size` on Panel, `ResizeHandle.tsx`, `panel.css` `.art-resizer` - Panel has no width or resize option; the owner requires a 400-720 px resizable panel, default 440.
+- `vite.config.mts` theme CSS alias - `recursica_variables_scoped.css` is not in the package's `exports`; without the alias the build can't import it.
+
+Kept, our own elements that no component covers (tokens only, owner-requested):
+
+- `panel.css` `.art-shot-frame` (the bordered frame around a comment's image; no image component), `.art-thumb` (image scales to the frame), `.art-shot-well` / `.art-shot-scroll` (the editor's bordered, scrolling image area), `.art-shot` canvases (drawing), `.art-swatch` (pen colours are baked into screenshots, so fixed), `.art-sr-only` (no visually-hidden utility), `.art-list` (reset for the list semantics a card set needs).
+
+Removed in round 10 (the UI now shows the adapter's real behaviour):
+
+- `.art-toast-anchor` - the toast's hand-set bottom-left position. The kit's Toast has no placement, so the toast now shows at the top-left of the viewport.
+- `.art-thumb` 320 px height cap - a tall screenshot now shows at full height.
+- The spacer in the annotation editor's footer - the modal footer has no left-hand slot, so Delete screenshot now sits with Cancel and Save.
+- `maw={560}` on the confirmation text - the text now runs the modal's full width.
+- The footer's wrap wrapper (`ml="auto"`) - not needed at the 400 px minimum.
+- The switch row's slot and styles (the switches moved into the View menu).
+
 ## Data model
 
 Everything lives under one `chrome.storage.local` key
@@ -221,8 +275,8 @@ session = {
 
 The types live in `src/content/lib/types.ts`. Reviewer identity
 (`snippyUser`, `snippyEmail`), the panel's width (`snippyPanelWidth`) and
-the annotation pen's last colour (`snippyPenColor`) and the two view
-switches (`snippyPageOnly`, `snippyShowImages`, both on unless stored as
+the annotation pen's last colour (`snippyPenColor`) and the two View menu
+options (`snippyPageOnly`, `snippyShowImages`, both on unless stored as
 `false`) are stored under **separate** keys and never cleared by "Start
 over" - they're
 identity/preference facts, not session data. The download modal edits

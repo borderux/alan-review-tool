@@ -62,7 +62,7 @@ export function CommentList({
   onAnnotate,
 }: CommentListProps) {
   const list = (group: PageGroup, label: string) => (
-    <Stack component="ol" className="art-list" aria-label={label} gap="rec-lg">
+    <Stack component="ol" className="art-list" aria-label={label} gap="rec-sm">
       {group.comments.map((comment) => (
         <CommentItem
           key={comment.id}
@@ -94,9 +94,9 @@ export function CommentList({
   if (!grouped) return list(visible[0], "Comments on this page");
 
   return (
-    <Stack gap="rec-2xl">
+    <Stack gap="rec-lg">
       {visible.map((group) => (
-        <Stack key={group.pageKey} gap="rec-md" component="section">
+        <Stack key={group.pageKey} gap="rec-sm" component="section">
           <Stack gap="rec-none">
             <Heading order={3}>
               {group.title || shortUrl(group.pageKey)}

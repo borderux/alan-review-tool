@@ -1,4 +1,4 @@
-import { Button, Modal, Stack, Text } from "@recursica/adapter-mantine-v8";
+import { Button, Modal, Text } from "@recursica/adapter-mantine-v8";
 import { useModalPortal } from "../modalPortal";
 
 interface ConfirmModalProps {
@@ -35,10 +35,7 @@ export function ConfirmModal({
       returnFocus={false}
       closeButtonProps={{ "aria-label": `Cancel: ${title}` }}
     >
-      {/* Body text keeps a readable line length, however wide the modal. */}
-      <Stack maw={560}>
-        <Text>{consequence}</Text>
-      </Stack>
+      <Text>{consequence}</Text>
       <Modal.Footer>
         {/* Initial focus: the safe choice, not the header's close button. */}
         <Button variant="outline" data-autofocus onClick={onCancel}>

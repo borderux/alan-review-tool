@@ -18,7 +18,7 @@ import {
 import { ConfirmModal } from "./components/ConfirmModal";
 import { DownloadModal, type ReportDetails } from "./components/DownloadModal";
 import { ResizeHandle } from "./components/ResizeHandle";
-import { ViewControls } from "./components/ViewControls";
+import { ViewMenu } from "./components/ViewMenu";
 import { captureElement, captureRegion } from "./lib/capture";
 import { formatCount, plural } from "./lib/format";
 import { commentName } from "./lib/ids";
@@ -102,8 +102,8 @@ export function ReviewPanel({
   // Where the Add menu renders: a slot at the start of the panel header,
   // before the title (see below).
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
-  // Where the view switches render: a slot between the panel header and
-  // its scrolling body (see below).
+  // Where the View menu renders: a slot in the header between the title
+  // and the close button (see below).
   const [viewSlot, setViewSlot] = useState<HTMLElement | null>(null);
   const [pageOnly, setPageOnly] = useState(stored.pageOnly);
   const [showImages, setShowImages] = useState(stored.showImages);
@@ -166,39 +166,31 @@ export function ReviewPanel({
     if (opened) markPanelNonModal(host);
   }, [host, opened]);
 
-  // The Add menu sits in the panel header, left of the title. The kit's
-  // panel header has a title and a close button and no slot for anything
-  // else, and putting a button inside the title would make the panel's
-  // accessible name "Add Snippy". So a slot element is placed first in the
-  // header and the menu is rendered into it (a reported gap: no header
-  // actions slot on Panel).
+  // Workaround (adapter gap): the kit's panel header has a title and a
+  // close button and no slot for actions, and its compound parts
+  // (Panel.Header, Panel.Title) carry none of the panel's styling, so a
+  // custom header can't be composed either. Putting buttons inside the
+  // title would make the panel's accessible name "Add Snippy View". So two
+  // slot elements are placed in the header - one first, for the Add menu,
+  // and one just before the close button, for the View menu - and the
+  // menus are rendered into them. Header order: Add, title, View, Close.
   useEffect(() => {
     const header = findInPanel(host, ".mantine-Drawer-header");
     if (!header) return;
-    const slot = document.createElement("div");
-    slot.className = "art-header-slot";
-    header.prepend(slot);
-    const frame = requestAnimationFrame(() => setHeaderSlot(slot));
+    const start = document.createElement("div");
+    start.className = "art-header-slot";
+    header.prepend(start);
+    const end = document.createElement("div");
+    end.className = "art-header-slot";
+    header.insertBefore(end, header.querySelector(".mantine-Drawer-close"));
+    const frame = requestAnimationFrame(() => {
+      setHeaderSlot(start);
+      setViewSlot(end);
+    });
     return () => {
       cancelAnimationFrame(frame);
-      slot.remove();
-    };
-  }, [host]);
-
-  // The view switches sit between the panel header and its body, outside
-  // the part that scrolls, so they stay put while the list scrolls. The
-  // kit's panel has no slot for that either (a reported gap), so one is
-  // placed right after the header.
-  useEffect(() => {
-    const header = findInPanel(host, ".mantine-Drawer-header");
-    if (!header) return;
-    const slot = document.createElement("div");
-    slot.className = "art-view-slot";
-    header.after(slot);
-    const frame = requestAnimationFrame(() => setViewSlot(slot));
-    return () => {
-      cancelAnimationFrame(frame);
-      slot.remove();
+      start.remove();
+      end.remove();
     };
   }, [host]);
 
@@ -517,11 +509,7 @@ export function ReviewPanel({
         */}
         {/* Buttons only, no text (owner decision). */}
         <Panel.Footer>
-          {/* At the narrowest panel widths the two default-size buttons,
-              with the count, don't fit on one line. They wrap rather than
-              cut the label short, and Download comments stays at the right.
-              Open with the owner. */}
-          <Group justify="space-between" wrap="wrap" gap="rec-sm" w="100%">
+          <Group justify="space-between" wrap="nowrap" gap="rec-sm" w="100%">
             {/* The footer's two buttons are the default size; every other
                 button in the panel is small (owner decision). */}
             <Button
@@ -536,23 +524,21 @@ export function ReviewPanel({
                 not only the ones showing. In parentheses after a label
                 that doesn't change, left out at zero; the accessible name
                 spells it out. */}
-            <Group ml="auto">
-              <Button
-                variant="solid"
-                disabled={total === 0}
-                data-download="true"
-                aria-label={
-                  total > 0
-                    ? `Download ${plural(total, "comment", "comments")}`
-                    : undefined
-                }
-                onClick={() => setDownloadOpen(true)}
-              >
-                {total > 0
-                  ? `Download comments (${formatCount(total)})`
-                  : "Download comments"}
-              </Button>
-            </Group>
+            <Button
+              variant="solid"
+              disabled={total === 0}
+              data-download="true"
+              aria-label={
+                total > 0
+                  ? `Download ${plural(total, "comment", "comments")}`
+                  : undefined
+              }
+              onClick={() => setDownloadOpen(true)}
+            >
+              {total > 0
+                ? `Download comments (${formatCount(total)})`
+                : "Download comments"}
+            </Button>
           </Group>
         </Panel.Footer>
       </Panel>
@@ -560,11 +546,14 @@ export function ReviewPanel({
       {/*
         The toast's live region is always in the DOM, so a message inserted
         into it is announced; a region created together with its message
-        often is not. It sits over the page, not in the panel: the theme's
-        toast min-width is wider than the panel.
+        often is not (a MUST in the toast rules). It renders in the layer-0
+        portal. The kit's Toast has no placement of its own, so it shows
+        wherever that container is - the top-left corner of the viewport;
+        the hand-set position it used to have was removed in the adapter
+        workaround audit.
       */}
       {createPortal(
-        <div className="art-toast-anchor" aria-live="assertive" aria-atomic>
+        <div aria-live="assertive" aria-atomic>
           {toast && (
             <Toast
               variant="error"
@@ -594,7 +583,7 @@ export function ReviewPanel({
       {viewSlot &&
         !loadFailed &&
         createPortal(
-          <ViewControls
+          <ViewMenu
             pageOnly={pageOnly}
             showImages={showImages}
             onPageOnlyChange={(next) => {
