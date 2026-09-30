@@ -18,7 +18,8 @@ JavaScript in what you export.
 - **This page only, or every page** — two checkboxes above the footer
   buttons. "Only view comments for this url" (checked by default) shows
   just the current page's comments; unchecked, it shows every page's,
-  grouped under page headings. "Show screenshot thumbnails" (checked by
+  grouped under page headings that link to each page. "Show screenshot
+  thumbnails" (checked by
   default) can hide the screenshots in the panel (never in the report).
   Both are remembered.
 - **Screenshot capture with freehand annotation** — drag-select any region
@@ -42,7 +43,9 @@ JavaScript in what you export.
   reviewer's name, email and session details each time, prefilled with
   the last values used.
 - **Exports a single, self-contained HTML report** — header, table of
-  contents, one section per page, tight comment list, 50×50 thumbnails
+  contents, one section per page, tight comment list, a link on every
+  comment back to its page (to the element itself when it has a simple,
+  unique id), 50×50 thumbnails
   with a full-resolution lightbox. The lightbox is pure CSS (`:target`,
   no JavaScript at all); the whole report has zero `<script>` tags.
 - **Comments are numbered 1 to N** across the session, in the order they

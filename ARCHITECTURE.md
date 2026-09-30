@@ -39,7 +39,8 @@ Recursica design system and bundled by Vite into one content script;
     failed-load state (storage could not be read: the panel opens empty,
     Add disabled, with a message in its body).
   - `components/` - the one view (`CommentList`: the current page's
-    comments, or every page's grouped under page headings), the view
+    comments, or every page's grouped under page headings, each heading a
+    link to its page, in the same tab), the view
     options (`ViewOptions`: a checkbox group, "Only view comments for this
     url" and "Show screenshot thumbnails", in the pinned footer above its
     buttons), the Add menu (`AddMenu`: a small icon-only plus button in
@@ -58,6 +59,7 @@ Recursica design system and bundled by Vite into one content script;
   - `useReviewSession.ts` - all session state and saving.
   - `modalPortal.ts` - hands every modal its layer-1 portal container.
   - `lib/` - framework-free modules: storage and migration, page push,
+    comment and page links (`links.ts`),
     screenshot capture, the report builder, ids, formatting.
   - `styles.ts`, `panel.css`, `fonts.ts` - see
     [Styling inside the shadow root](#styling-inside-the-shadow-root).
@@ -240,6 +242,8 @@ Adapter gaps with no workaround (the UI shows the kit's real behaviour):
 - `Panel` body padding is a fixed 24 px left and right, 16 px top and bottom (`content-horizontal-padding`, `content-vertical-padding`); no prop changes it. With the card's 2 px border and 24 px padding, a comment's text box starts 51 px in from the panel edge.
 - The panel title's glyphs sit off the centre of their line box (the theme's header type: Dongle at 56 px with a 39.2 px line height), so the title can look off-centre beside the header's buttons, although every header item's box shares one centre line.
 
+- `Link` applies its own text style, so a page title that is a link inside a heading shows at the link's size, not the heading's.
+
 Removed in rounds 10 and 11 (the UI now shows the adapter's real behaviour):
 
 - `.art-toast-anchor` - the toast's hand-set bottom-left position. The kit's Toast has no placement, so the toast now shows at the top-left of the viewport.
@@ -382,6 +386,15 @@ rendered with React:
   `formatCommentId` and `commentName` in `lib/ids.ts` are the one place a
   number becomes text, in the panel and the report alike. (Reports from
   before this wrote it as `CM-<n>`.)
+- **A link per comment**, in `p.comment-link`, back to the comment's own
+  page (full `href`, visible text without the query string), so a comment
+  read on its own still says where it came from. An element comment links
+  to `#<id>` on that page only when its element had a simple, unique id at
+  capture time: `elementFragmentId()` in `lib/links.ts` accepts only a
+  selector that is exactly `#<id>` (which `selectorFor` writes only for an
+  id unique in the document, never inside a shadow root) with a plain id
+  that the captured HTML's own `id` matches. No fragment is ever made from
+  class names or paths. Only http, https and file addresses become links.
 - **Element comments** also show the captured element: its selector and
   viewport, then its HTML and styles in collapsible `<details>` sections
   (no JavaScript needed), all escaped.

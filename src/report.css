@@ -90,6 +90,14 @@ h1 {
   color: #aaa;
   margin: 0 0 2px;
 }
+.comment-link {
+  font-size: 11px;
+  margin: 0 0 2px;
+}
+.comment-link a {
+  color: #2563eb;
+  word-break: break-all;
+}
 .comment-text {
   font-size: 13px;
   margin: 0;

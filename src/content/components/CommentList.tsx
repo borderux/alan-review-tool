@@ -1,5 +1,6 @@
 import type { MutableRefObject } from "react";
-import { Heading, Stack, Text } from "@recursica/adapter-mantine-v8";
+import { Heading, Link, Stack, Text } from "@recursica/adapter-mantine-v8";
+import { pageHref } from "../lib/links";
 import type { ReviewComment } from "../lib/types";
 import type { FormLayout } from "../ReviewPanel";
 import type { ReviewSession } from "../useReviewSession";
@@ -102,21 +103,45 @@ export function CommentList({
       </Stack>
     );
 
+  // Each page heading is a link to that page, with a real href, in the
+  // same tab: the link rules forbid opening a new tab automatically, and
+  // the reviewer can still choose one with a modifier key or the context
+  // menu. The name says it is a page; when two pages share a title, the
+  // address is added so the names stay distinct.
+  const titleOf = (g: PageGroup) => g.title || shortUrl(g.pageKey);
+  const sharedTitle = (g: PageGroup) =>
+    visible.filter((o) => titleOf(o) === titleOf(g)).length > 1;
   return (
     <Stack gap="rec-xl" mb="rec-lg">
-      {visible.map((group) => (
-        <Stack key={group.pageKey} gap="rec-lg" component="section">
-          <Stack gap="rec-none">
-            <Heading order={3}>
-              {group.title || shortUrl(group.pageKey)}
-            </Heading>
-            <Text variant="caption" emphasis="low" truncate>
-              {shortUrl(group.pageKey)}
-            </Text>
+      {visible.map((group) => {
+        const href = pageHref(group.pageKey);
+        return (
+          <Stack key={group.pageKey} gap="rec-lg" component="section">
+            <Stack gap="rec-none">
+              <Heading order={3}>
+                {href ? (
+                  <Link
+                    href={href}
+                    aria-label={
+                      sharedTitle(group)
+                        ? `Page: ${titleOf(group)}, ${shortUrl(group.pageKey)}`
+                        : `Page: ${titleOf(group)}`
+                    }
+                  >
+                    {titleOf(group)}
+                  </Link>
+                ) : (
+                  titleOf(group)
+                )}
+              </Heading>
+              <Text variant="caption" emphasis="low" truncate>
+                {shortUrl(group.pageKey)}
+              </Text>
+            </Stack>
+            {list(group, `Comments on ${titleOf(group)}`)}
           </Stack>
-          {list(group, `Comments on ${group.title || shortUrl(group.pageKey)}`)}
-        </Stack>
-      ))}
+        );
+      })}
     </Stack>
   );
 }

@@ -8,6 +8,7 @@ import AI_INSTRUCTIONS from "../../ai-report-instructions.txt?raw";
 import { HTML_CAP } from "./element";
 import { formatCount, formatDateTimeWithZone, plural } from "./format";
 import { commentName, formatCommentId } from "./ids";
+import { commentHref } from "./links";
 import type { RecursicaDetection } from "./recursica";
 import type { CapturedElement, Session } from "./types";
 
@@ -136,7 +137,17 @@ export function buildReportHtml({
           const commentId = hasNumber
             ? formatCommentId(comment.commentNumber)
             : "";
-          return `<div class="comment" data-comment-id="${escapeHtml(commentId)}"><div class="comment-body">${hasNumber ? `<p class="comment-id">${escapeHtml(commentName(comment.commentNumber, true))}</p>` : ""}<p class="comment-text">${escapeHtml(comment.text).replace(/\n/g, "<br>")}</p>${comment.element ? elementHtml(comment.element) : ""}</div>${shotsHtml}</div>`;
+          // Every comment links back to its own page, so a comment read on
+          // its own still says where it came from - an element comment to
+          // the element itself when it had a simple, unique id. The visible
+          // text drops the query string, like the page heading; the href
+          // keeps the full address.
+          const href = commentHref(url, comment.element);
+          const linkText = href ? href.replace(/\?[^#]*/, "") : "";
+          const linkHtml = href
+            ? `<p class="comment-link"><a href="${escapeHtml(href)}">${escapeHtml(linkText)}</a></p>`
+            : "";
+          return `<div class="comment" data-comment-id="${escapeHtml(commentId)}"><div class="comment-body">${hasNumber ? `<p class="comment-id">${escapeHtml(commentName(comment.commentNumber, true))}</p>` : ""}${linkHtml}<p class="comment-text">${escapeHtml(comment.text).replace(/\n/g, "<br>")}</p>${comment.element ? elementHtml(comment.element) : ""}</div>${shotsHtml}</div>`;
         })
         .join("\n");
 
