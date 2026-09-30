@@ -1,16 +1,37 @@
 import { useEffect, useId, useRef, useState } from "react";
-import type { PointerEvent as ReactPointerEvent } from "react";
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+} from "react";
 import {
   Button,
   Dropdown,
   Group,
   Modal,
+  SegmentedControl,
   Stack,
 } from "@recursica/adapter-mantine-v8";
+import {
+  ARROW_LENGTH_PX,
+  DOT_RADIUS_PX,
+  arrowGeometry,
+  bounds,
+  dotNumbers,
+  moveAnnotation,
+  renderAnnotated,
+  type Annotation,
+} from "../lib/annotations";
 import { commentName } from "../lib/ids";
-import { OUTLINE_PX, PEN, STROKE_PX } from "../lib/pen";
-import { PEN_COLORS, type PenColor } from "../lib/storage";
+import {
+  OUTLINE_PX,
+  PEN,
+  PEN_COLORS,
+  STROKE_PX,
+  type PenColor,
+} from "../lib/pen";
+import { isMac } from "../lib/shortcuts";
 import type { ReviewComment } from "../lib/types";
+import type { CommentFields } from "../useReviewSession";
 import { useModalPortal } from "../modalPortal";
 import { ConfirmModal } from "./ConfirmModal";
 
@@ -19,7 +40,9 @@ interface AnnotationEditorProps {
   penColor: PenColor;
   onPenColorChange: (color: PenColor) => void;
   onCancel: () => void;
-  onSave: (dataUrl: string) => void;
+  // The fields to store: the annotated image, the clean image and the
+  // objects - or, with every annotation removed, the clean image alone.
+  onSave: (fields: CommentFields) => void;
   onDeleteScreenshot: () => void;
 }
 
@@ -27,6 +50,19 @@ interface AnnotationEditorProps {
 // replacing it, so cancelling returns to the editor with the drawing still
 // there. Every action here that can't be undone asks first (owner rule).
 type EditorConfirmation = "discard" | "clear" | "delete";
+
+type Tool = "select" | "pen" | "arrow" | "dot";
+const TOOLS: { value: Tool; label: string }[] = [
+  { value: "select", label: "Select" },
+  { value: "pen", label: "Pen" },
+  { value: "arrow", label: "Arrow" },
+  { value: "dot", label: "Numbered dot" },
+];
+const KIND_NAME: Record<Annotation["kind"], string> = {
+  stroke: "Pen stroke",
+  arrow: "Arrow",
+  dot: "Numbered dot",
+};
 
 // Where focus is inside the panel's shadow root (document.activeElement is
 // the shadow host there).
@@ -48,15 +84,86 @@ function swatch(color: PenColor) {
   );
 }
 
-// A comment's screenshot, full size, with freehand drawing on top.
-// Drawing happens on transparent canvases laid exactly over the image, in
-// the image's natural-resolution coordinates, so strokes stay crisp once
-// merged into the full-resolution screenshot. Two canvases: the contrasting
-// outline underneath, the colour on top, so a stroke never paints its
-// outline over an earlier stroke's colour. Nothing is saved unless the
-// reviewer chooses Save annotations. Cancel, Escape and the close button
-// close the editor - asking first when there is an unsaved drawing - and a
-// click on the backdrop does nothing at all.
+// One annotation drawn in the editor's SVG layer, in image px - the same
+// shapes drawAnnotations paints into the saved image.
+function AnnotationShape({
+  a,
+  w,
+  h,
+  number,
+}: {
+  a: Annotation;
+  w: number;
+  h: number;
+  number?: number;
+}) {
+  const pen = PEN[a.color];
+  if (a.kind === "stroke") {
+    const width = a.size * w;
+    const pts = a.points.map(([x, y]) => `${x * w},${y * h}`).join(" ");
+    return (
+      <>
+        <polyline
+          points={pts}
+          className="art-ann-hit"
+          strokeWidth={Math.max(width * 3, 16)}
+        />
+        <polyline
+          points={pts}
+          stroke={pen.outline}
+          strokeWidth={width + (2 * OUTLINE_PX * width) / STROKE_PX}
+        />
+        <polyline points={pts} stroke={pen.stroke} strokeWidth={width} />
+      </>
+    );
+  }
+  if (a.kind === "arrow") {
+    const g = arrowGeometry(a, w, h);
+    const d = `M${g.tail.x},${g.tail.y} L${g.tip.x},${g.tip.y} M${g.b1.x},${g.b1.y} L${g.tip.x},${g.tip.y} L${g.b2.x},${g.b2.y}`;
+    return (
+      <>
+        <path d={d} className="art-ann-hit" strokeWidth={g.width * 5} />
+        <path
+          d={d}
+          stroke={pen.outline}
+          strokeWidth={g.width + 2 * Math.max(1, g.width / 3)}
+        />
+        <path d={d} stroke={pen.stroke} strokeWidth={g.width} />
+      </>
+    );
+  }
+  const r = a.size * w;
+  return (
+    <>
+      <circle
+        cx={a.x * w}
+        cy={a.y * h}
+        r={r}
+        fill={pen.stroke}
+        stroke={pen.outline}
+        strokeWidth={Math.max(1.5, r / 7)}
+      />
+      <text
+        x={a.x * w}
+        y={a.y * h + r * 0.05}
+        fill={pen.outline}
+        fontSize={Math.round(r * 1.15)}
+        className="art-ann-number"
+      >
+        {number}
+      </text>
+    </>
+  );
+}
+
+// A comment's screenshot, with annotations on top: pen strokes, arrows and
+// numbered dots, each an object that can be selected (click, or Tab to
+// it), moved (drag, or the arrow keys) and deleted (Delete or Backspace),
+// with undo and redo. They stay editable after Save: the comment keeps the
+// clean image and the objects, and the annotated image is rendered from
+// them. Nothing is saved unless the reviewer chooses Save annotations.
+// Cancel, Escape and the close button close the editor - asking first when
+// there are unsaved changes - and a click on the backdrop does nothing.
 export function AnnotationEditor({
   comment,
   penColor,
@@ -67,12 +174,32 @@ export function AnnotationEditor({
 }: AnnotationEditorProps) {
   const id = commentName(comment.commentNumber);
   const target = useModalPortal();
-  const imgRef = useRef<HTMLImageElement>(null);
-  const outlineRef = useRef<HTMLCanvasElement>(null);
-  const strokeRef = useRef<HTMLCanvasElement>(null);
-  const last = useRef<{ x: number; y: number } | null>(null);
-  const [hasDrawing, setHasDrawing] = useState(false);
+  // The image the annotations sit on: the clean one when there is one.
+  // An older comment's one image (perhaps with a drawing baked in) is the
+  // base otherwise.
+  const base = comment.screenshotClean ?? comment.screenshot;
+  // What was saved before, to tell whether anything changed.
+  const [initial] = useState<string>(() =>
+    JSON.stringify(comment.annotations ?? []),
+  );
+  const [list, setList] = useState<Annotation[]>(comment.annotations ?? []);
+  const [past, setPast] = useState<Annotation[][]>([]);
+  const [future, setFuture] = useState<Annotation[][]>([]);
+  const [tool, setTool] = useState<Tool>("pen");
+  const [selected, setSelected] = useState<number | null>(null);
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const drawing = useRef<[number, number][] | null>(null);
+  const [draft, setDraft] = useState<Annotation | null>(null);
+  const drag = useRef<{
+    index: number;
+    from: { x: number; y: number };
+    origin: Annotation;
+    moved: boolean;
+  } | null>(null);
   const saveReasonId = useId();
+  const dirty = JSON.stringify(list) !== initial;
   // While the pen color list is open, Escape belongs to the list: it closes
   // the list, not the whole editor (which would throw the drawing away).
   // Mantine closes the modal from a capture listener on window, before the
@@ -109,104 +236,187 @@ export function AnnotationEditor({
     requestAnimationFrame(() => trigger?.focus());
   };
 
-  // Cancel, Escape and the close button: straight out when nothing was
-  // drawn, otherwise ask before the drawing is thrown away.
+  // Cancel, Escape and the close button: straight out when nothing
+  // changed, otherwise ask before the changes are thrown away.
   const requestClose = () => {
-    if (hasDrawing) ask("discard");
+    if (dirty) ask("discard");
     else onCancel();
   };
 
-  const sizeCanvases = () => {
-    const img = imgRef.current;
-    if (!img) return;
-    for (const canvas of [outlineRef.current, strokeRef.current]) {
-      if (!canvas) continue;
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-    }
+  // Every change goes through here, so it can be undone.
+  const commit = (next: Annotation[], before: Annotation[] = list) => {
+    setPast((p) => [...p, before]);
+    setFuture([]);
+    setList(next);
+  };
+  const undo = () => {
+    if (past.length === 0) return;
+    setFuture((f) => [list, ...f]);
+    setList(past[past.length - 1]);
+    setPast((p) => p.slice(0, -1));
+    setSelected(null);
+  };
+  const redo = () => {
+    if (future.length === 0) return;
+    setPast((p) => [...p, list]);
+    setList(future[0]);
+    setFuture((f) => f.slice(1));
+    setSelected(null);
+  };
+  const remove = (index: number) => {
+    commit(list.filter((_, i) => i !== index));
+    setSelected(null);
+    requestAnimationFrame(() =>
+      bodyRef.current?.querySelector<HTMLElement>(".art-shot-scroll")?.focus(),
+    );
   };
 
-  const toCanvasPoint = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    const canvas = event.currentTarget;
-    const rect = canvas.getBoundingClientRect();
-    const scale = canvas.width / rect.width;
+  // The pointer's position as a fraction of the image, and the image px
+  // per CSS px at the current display size.
+  const toImage = (event: ReactPointerEvent) => {
+    const rect = svgRef.current!.getBoundingClientRect();
     return {
-      x: (event.clientX - rect.left) * scale,
-      y: (event.clientY - rect.top) * scale,
-      scale,
+      x: (event.clientX - rect.left) / rect.width,
+      y: (event.clientY - rect.top) / rect.height,
+      scale: (size?.w ?? rect.width) / rect.width,
     };
   };
 
-  const segment = (
-    canvas: HTMLCanvasElement | null,
-    color: string,
-    width: number,
-    from: { x: number; y: number },
-    to: { x: number; y: number },
-  ) => {
-    const ctx = canvas?.getContext("2d");
-    if (!ctx) return;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = width;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.beginPath();
-    ctx.moveTo(from.x, from.y);
-    ctx.lineTo(to.x, to.y);
-    ctx.stroke();
-  };
-
-  const onPointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const p = toCanvasPoint(event);
-    last.current = { x: p.x, y: p.y };
-  };
-
-  const onPointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    if (!last.current) return;
-    const p = toCanvasPoint(event);
-    const to = { x: p.x, y: p.y };
-    const pen = PEN[penColor];
-    segment(
-      outlineRef.current,
-      pen.outline,
-      (STROKE_PX + 2 * OUTLINE_PX) * p.scale,
-      last.current,
-      to,
-    );
-    segment(
-      strokeRef.current,
-      pen.stroke,
-      STROKE_PX * p.scale,
-      last.current,
-      to,
-    );
-    last.current = to;
-    if (!hasDrawing) setHasDrawing(true);
-  };
-
-  const stopDrawing = () => {
-    last.current = null;
-  };
-
-  const clearDrawing = () => {
-    for (const canvas of [outlineRef.current, strokeRef.current]) {
-      canvas?.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+  const onPointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (!size || event.button !== 0) return;
+    const p = toImage(event);
+    const hit = (event.target as Element).closest?.("[data-ann]");
+    if (tool === "select") {
+      if (!hit) {
+        setSelected(null);
+        return;
+      }
+      const index = Number(hit.getAttribute("data-ann"));
+      setSelected(index);
+      svgRef.current!.setPointerCapture(event.pointerId);
+      drag.current = { index, from: p, origin: list[index], moved: false };
+      return;
     }
-    setHasDrawing(false);
+    svgRef.current!.setPointerCapture(event.pointerId);
+    if (tool === "pen") {
+      drawing.current = [[p.x, p.y]];
+      setDraft({
+        kind: "stroke",
+        color: penColor,
+        points: drawing.current,
+        size: (STROKE_PX * p.scale) / size.w,
+      });
+      return;
+    }
+    const placed: Annotation =
+      tool === "arrow"
+        ? {
+            kind: "arrow",
+            color: penColor,
+            x: p.x,
+            y: p.y,
+            size: (ARROW_LENGTH_PX * p.scale) / size.w,
+          }
+        : {
+            kind: "dot",
+            color: penColor,
+            x: p.x,
+            y: p.y,
+            size: (DOT_RADIUS_PX * p.scale) / size.w,
+          };
+    commit([...list, placed]);
+    setSelected(list.length);
+  };
+
+  const onPointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (drawing.current && draft?.kind === "stroke") {
+      const p = toImage(event);
+      drawing.current = [...drawing.current, [p.x, p.y]];
+      setDraft({ ...draft, points: drawing.current });
+    } else if (drag.current) {
+      const p = toImage(event);
+      const d = drag.current;
+      d.moved = true;
+      setList((current) =>
+        current.map((a, i) =>
+          i === d.index
+            ? moveAnnotation(d.origin, p.x - d.from.x, p.y - d.from.y)
+            : a,
+        ),
+      );
+    }
+  };
+
+  const onPointerUp = () => {
+    if (drawing.current && draft) {
+      commit([...list, draft]);
+      drawing.current = null;
+      setDraft(null);
+    } else if (drag.current) {
+      const d = drag.current;
+      drag.current = null;
+      if (d.moved) {
+        const before = list.map((a, i) => (i === d.index ? d.origin : a));
+        setPast((p) => [...p, before]);
+        setFuture([]);
+      }
+    }
+  };
+
+  // The editor's own keys. Never while typing in a field (the pen color
+  // box), so Delete and the shortcuts there do what they always do.
+  const onKeyDown = (event: ReactKeyboardEvent) => {
+    const t = event.target as HTMLElement;
+    if (t.closest("input, textarea, [contenteditable='true']")) return;
+    const mod = isMac() ? event.metaKey : event.ctrlKey;
+    if (mod && event.code === "KeyZ") {
+      event.preventDefault();
+      if (event.shiftKey) redo();
+      else undo();
+      return;
+    }
+    if (!isMac() && event.ctrlKey && event.code === "KeyY") {
+      event.preventDefault();
+      redo();
+      return;
+    }
+    if (selected == null) return;
+    if (event.key === "Delete" || event.key === "Backspace") {
+      event.preventDefault();
+      remove(selected);
+      return;
+    }
+    const step = event.shiftKey ? 0.05 : 0.01;
+    const moves: Record<string, [number, number]> = {
+      ArrowLeft: [-step, 0],
+      ArrowRight: [step, 0],
+      ArrowUp: [0, -step],
+      ArrowDown: [0, step],
+    };
+    if (event.key in moves && t.closest("[data-ann]")) {
+      event.preventDefault();
+      const [dx, dy] = moves[event.key];
+      commit(
+        list.map((a, i) =>
+          i === selected
+            ? moveAnnotation(a, dx, (dy * (size?.w ?? 1)) / (size?.h ?? 1))
+            : a,
+        ),
+      );
+    }
   };
 
   const confirmationCopy = {
     discard: {
       title: "Discard drawing?",
       consequence:
-        "What you drew on this screenshot will be lost. This can't be undone.",
+        "Your changes to the annotations on this screenshot will be lost. This can't be undone.",
       confirmLabel: "Discard drawing",
     },
     clear: {
       title: "Clear annotations?",
       consequence:
-        "Everything you drew since opening this screenshot will be removed. This can't be undone.",
+        "Every annotation on this screenshot will be removed. Undo can bring them back while the editor is open.",
       confirmLabel: "Clear annotations",
     },
     delete: {
@@ -222,27 +432,40 @@ export function AnnotationEditor({
     if (kind === "discard") onCancel();
     else if (kind === "delete") onDeleteScreenshot();
     else if (kind === "clear") {
-      clearDrawing();
+      commit([]);
+      setSelected(null);
       // Clear annotations stays; focus goes back to it.
       const trigger = confirmTrigger.current;
       requestAnimationFrame(() => trigger?.focus());
     }
   };
 
-  // Merges the drawing into the image. From then on it is just pixels.
-  const save = () => {
-    const img = imgRef.current;
-    if (!img || !outlineRef.current || !strokeRef.current) return;
-    const merged = document.createElement("canvas");
-    merged.width = img.naturalWidth;
-    merged.height = img.naturalHeight;
-    const ctx = merged.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(img, 0, 0);
-    ctx.drawImage(outlineRef.current, 0, 0);
-    ctx.drawImage(strokeRef.current, 0, 0);
-    onSave(merged.toDataURL("image/jpeg", 0.9));
+  // Keeps two images when there are annotations: the clean one and one
+  // rendered with every annotation. With none left, just the clean image.
+  const save = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      if (list.length === 0) {
+        onSave({
+          screenshot: base,
+          screenshotClean: undefined,
+          annotations: undefined,
+        });
+        return;
+      }
+      onSave({
+        screenshot: await renderAnnotated(base, list),
+        screenshotClean: base,
+        annotations: list,
+      });
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const numbers = dotNumbers(list);
+  const shown = draft ? [...list, draft] : list;
 
   return (
     <Modal
@@ -261,9 +484,20 @@ export function AnnotationEditor({
       returnFocus={false}
       closeButtonProps={{ "aria-label": "Close screenshot without saving" }}
     >
-      <Stack gap="rec-default" ref={bodyRef}>
-        {/* The toolbar stays put; only the image area beneath it scrolls. */}
-        <Group justify="space-between" align="flex-end" gap="rec-default">
+      <Stack gap="rec-default" ref={bodyRef} onKeyDown={onKeyDown}>
+        {/* The toolbar stays put; only the image area beneath it scrolls.
+            The tool is a short exclusive choice laid out in a row, so it is
+            the kit's segmented control. */}
+        <Group align="flex-end" gap="rec-default" wrap="wrap">
+          <SegmentedControl
+            aria-label="Tool"
+            data={TOOLS}
+            value={tool}
+            onChange={(value) => {
+              setTool(value as Tool);
+              if (value !== "select") setSelected(null);
+            }}
+          />
           <Dropdown
             label="Pen color"
             formLayout="stacked"
@@ -285,11 +519,11 @@ export function AnnotationEditor({
             leftSection={swatch(penColor)}
             onChange={(value) => value && onPenColorChange(value as PenColor)}
           />
-          {/* Nothing drawn means nothing to lose: no question then. */}
+          {/* Nothing to clear means nothing to lose: no question then. */}
           <Button
             variant="outline"
             size="small"
-            onClick={() => hasDrawing && ask("clear")}
+            onClick={() => list.length > 0 && ask("clear")}
           >
             Clear annotations
           </Button>
@@ -297,24 +531,74 @@ export function AnnotationEditor({
         {/* A bordered container, so the image's edge shows against the
             modal; the image scrolls inside it. */}
         <div className="art-shot-well">
-          <div className="art-shot-scroll">
+          <div className="art-shot-scroll" tabIndex={-1}>
             <div className="art-shot">
               <img
-                ref={imgRef}
-                src={comment.screenshot}
+                src={base}
                 alt={`Screenshot attached to ${id}`}
-                onLoad={sizeCanvases}
+                onLoad={(event) =>
+                  setSize({
+                    w: event.currentTarget.naturalWidth,
+                    h: event.currentTarget.naturalHeight,
+                  })
+                }
               />
-              <canvas ref={outlineRef} aria-hidden />
-              <canvas
-                ref={strokeRef}
-                role="img"
-                aria-label={`Drawing layer on the screenshot for ${id}`}
-                onPointerDown={onPointerDown}
-                onPointerMove={onPointerMove}
-                onPointerUp={stopDrawing}
-                onPointerCancel={stopDrawing}
-              />
+              {size && (
+                <svg
+                  ref={svgRef}
+                  className="art-ann"
+                  data-tool={tool}
+                  viewBox={`0 0 ${size.w} ${size.h}`}
+                  preserveAspectRatio="none"
+                  aria-label={`Annotations on the screenshot for ${id}`}
+                  role="group"
+                  onPointerDown={onPointerDown}
+                  onPointerMove={onPointerMove}
+                  onPointerUp={onPointerUp}
+                  onPointerCancel={onPointerUp}
+                >
+                  {shown.map((a, i) => {
+                    const isDraft = draft != null && i === list.length;
+                    const n = list
+                      .slice(0, i + 1)
+                      .filter((x) => x.kind === a.kind).length;
+                    const label = `${KIND_NAME[a.kind]} ${a.kind === "dot" ? numbers.get(i) : n}`;
+                    return (
+                      <g
+                        key={i}
+                        data-ann={isDraft ? undefined : i}
+                        className="art-ann-item"
+                        tabIndex={isDraft ? undefined : 0}
+                        role={isDraft ? undefined : "button"}
+                        aria-label={isDraft ? undefined : label}
+                        aria-pressed={isDraft ? undefined : selected === i}
+                        onFocus={() => !isDraft && setSelected(i)}
+                      >
+                        <AnnotationShape
+                          a={a}
+                          w={size.w}
+                          h={size.h}
+                          number={numbers.get(i)}
+                        />
+                        {selected === i && (
+                          <rect
+                            className="art-ann-selection"
+                            {...(() => {
+                              const b = bounds(a, size.w, size.h);
+                              return {
+                                x: b.x,
+                                y: b.y,
+                                width: b.w,
+                                height: b.h,
+                              };
+                            })()}
+                          />
+                        )}
+                      </g>
+                    );
+                  })}
+                </svg>
+              )}
             </div>
           </div>
         </div>
@@ -322,7 +606,7 @@ export function AnnotationEditor({
       {/* The reason Save annotations starts disabled, for screen readers
           only (no visible helper text, by owner decision). */}
       <span id={saveReasonId} className="art-sr-only">
-        Draw on the screenshot to enable Save annotations.
+        Change the annotations to enable Save annotations.
       </span>
       {/* Every button is a direct child of the footer, so the modal's own
           button gap applies throughout. OWNER-APPROVED EXCEPTION: the rarely
@@ -339,9 +623,10 @@ export function AnnotationEditor({
         </Button>
         <Button
           variant="solid"
-          disabled={!hasDrawing}
-          aria-describedby={hasDrawing ? undefined : saveReasonId}
-          onClick={save}
+          disabled={!dirty}
+          loading={saving}
+          aria-describedby={dirty ? undefined : saveReasonId}
+          onClick={() => void save()}
         >
           Save annotations
         </Button>

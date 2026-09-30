@@ -1,4 +1,5 @@
 import { generateGuid } from "./ids";
+import { sanitizeAnnotations } from "./annotations";
 import { sanitizeDetection } from "./recursica";
 import type {
   CapturedElement,
@@ -34,15 +35,8 @@ const LEGACY_KEYS: Record<string, string[]> = {
   [PEN_COLOR_STORAGE_KEY]: ["taggerPenColor"],
 };
 
-export const PEN_COLORS = [
-  "red",
-  "white",
-  "black",
-  "green",
-  "blue",
-  "yellow",
-] as const;
-export type PenColor = (typeof PEN_COLORS)[number];
+import { PEN_COLORS, type PenColor } from "./pen";
+export { PEN_COLORS, type PenColor };
 export const DEFAULT_PEN_COLOR: PenColor = "red";
 
 // The owner approved this range (400-720, default 440) with the resize
@@ -150,6 +144,28 @@ export function migrateSession(raw: unknown): Session | null {
       const scale = comment.screenshotScale;
       if (typeof scale !== "number" || !(scale > 0 && scale <= 8))
         delete comment.screenshotScale;
+    }
+  }
+  // Annotated screenshots (added later) keep the clean image and the
+  // annotation objects beside the annotated `screenshot`. Both or neither:
+  // a malformed clean image drops both, malformed objects are dropped one
+  // by one, and with none left the clean image goes too (the comment keeps
+  // its one image).
+  for (const page of Object.values(session.pages)) {
+    for (const comment of page.comments) {
+      if (!("screenshotClean" in comment) && !("annotations" in comment))
+        continue;
+      const clean = comment.screenshotClean;
+      const list = sanitizeAnnotations(comment.annotations);
+      if (
+        typeof clean !== "string" ||
+        !clean.startsWith("data:image/") ||
+        list.length === 0 ||
+        !comment.screenshot
+      ) {
+        delete comment.screenshotClean;
+        delete comment.annotations;
+      } else comment.annotations = list;
     }
   }
   // Element comments (added later) carry an optional `element` field. Old

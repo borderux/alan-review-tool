@@ -342,7 +342,12 @@ export function ReviewPanel({
     review.updateComment(
       commentPage,
       comment.id,
-      { screenshot: result.dataUrl, screenshotScale: result.scale },
+      {
+        screenshot: result.dataUrl,
+        screenshotScale: result.scale,
+        screenshotClean: undefined,
+        annotations: undefined,
+      },
       "now",
     );
     setFocusId(comment.id);
@@ -710,11 +715,11 @@ export function ReviewPanel({
             review.track(savePenColor(color));
           }}
           onCancel={() => closeEditor(annotateComment.id)}
-          onSave={(dataUrl) => {
+          onSave={(fields) => {
             review.updateComment(
               annotating.pageKey,
               annotateComment.id,
-              { screenshot: dataUrl },
+              fields,
               "now",
             );
             closeEditor(annotateComment.id);
@@ -724,7 +729,12 @@ export function ReviewPanel({
             review.updateComment(
               annotating.pageKey,
               annotateComment.id,
-              { screenshot: null },
+              {
+                screenshot: null,
+                screenshotScale: undefined,
+                screenshotClean: undefined,
+                annotations: undefined,
+              },
               "now",
             );
             setAnnotating(null);

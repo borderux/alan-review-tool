@@ -22,12 +22,14 @@ JavaScript in what you export.
   thumbnails" (checked by
   default) can hide the screenshots in the panel (never in the report).
   Both are remembered.
-- **Screenshot capture with freehand annotation** — drag-select any region
-  of the page, then use Add annotations to draw on it, choosing one of six
-  pen colors from a dropdown (red by default; the last choice is
-  remembered). Every stroke
-  has a thin contrasting outline so it shows on light and dark
-  screenshots. Save annotations bakes the drawing into the image.
+- **Screenshot capture with editable annotations** — drag-select any
+  region of the page, then use Add annotations to mark it up with a pen,
+  arrows (pointing down and to the left) and numbered dots, in one of six
+  colors (red by default; the last choice is remembered). Every mark has a
+  thin contrasting outline so it shows on light and dark screenshots. Each
+  one can be selected, moved and deleted, with undo and redo, and they
+  stay editable after saving: Snippy keeps the clean screenshot and the
+  marks, and the report includes both images.
 - **Element capture** — Add, then Element, lets you pick any element on the page,
   like the browser's element inspector (hover and click, or the arrow keys
   and Enter). Snippy records its selector, HTML, key computed styles, the

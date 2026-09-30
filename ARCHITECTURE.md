@@ -51,12 +51,15 @@ Recursica design system and bundled by Vite into one content script;
     (`CommentItem`, the kit's Card) with Duplicate and Delete buttons and,
     when it has no screenshot, a solid Add screenshot button, the download
     modal (reviewer name, email and session details, every time comments
-    are downloaded), the annotation editor (a fixed toolbar with the pen
-    color dropdown and Clear annotations above a bordered, scrolling image
-    area; its own confirmations - discard drawing, clear annotations,
-    delete screenshot - stack on it), the shared confirmation modal, the
-    resize strip,
-    and `useManagedMenu` (menu focus handling that works in a shadow root).
+    are downloaded), the annotation editor (a fixed toolbar with the tool
+    control - Select, Pen, Arrow, Numbered dot, the kit's segmented control
+    - the pen color dropdown and Clear annotations above a bordered,
+      scrolling image; annotations are SVG objects over the image that can be
+      selected, dragged, moved with the arrow keys, deleted with Delete or
+      Backspace, and undone and redone with Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z; its own confirmations - discard drawing, clear annotations,
+      delete screenshot - stack on it), the shared confirmation modal, the
+      resize strip,
+      and `useManagedMenu` (menu focus handling that works in a shadow root).
   - `useReviewSession.ts` - all session state and saving.
   - `modalPortal.ts` - hands every modal its layer-1 portal container.
   - `lib/` - framework-free modules: storage and migration, page push,
@@ -347,6 +350,23 @@ The page key is the address the panel is on right now. Single-page apps
 change it without a reload, and a content script can't see the page's own
 history calls, so `usePageKey()` re-reads it on a short interval; comments
 added after an in-app navigation are filed under the new address.
+
+**Annotations stay editable.** A comment with annotations stores three
+things (all optional, added in round 16): `screenshot` - the annotated image
+the panel shows, rendered from the two below; `screenshotClean` - the image
+as captured; and `annotations` - the objects (`lib/annotations.ts`): pen
+strokes (points and width), arrows (head position and length; always
+pointing down and to the left at 45 degrees) and numbered dots (centre and
+radius; a dot's number is its place among the dots, so deleting one
+renumbers the rest). Every position and size is a fraction of the image's
+width (or height, for y), so they survive any display scale. Saving
+regenerates the annotated image from the clean one; saving with no
+annotations leaves just the clean image in `screenshot`. Deleting the
+screenshot, or adding a new one, removes all three. Older comments - one
+image, perhaps with a drawing baked in, and no objects - load unchanged and
+use that image as the base. `migrateSession()` keeps both fields or neither:
+malformed objects are dropped one by one, a malformed clean image drops
+both, and a clean image with no valid objects left is dropped.
 
 A screenshot may carry `screenshotScale`, the device pixel ratio it was captured at (added in round 16; optional, and dropped on load if it isn't a plausible ratio). The panel shows an image at no more than its natural size (its pixels divided by that ratio, or the current ratio for older comments), centred, and scales a larger one down to the frame.
 

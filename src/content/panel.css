@@ -184,18 +184,58 @@
   display: block;
   max-width: 100%;
 }
-.art-shot canvas {
+/* The annotation layer: an SVG exactly over the image, in the image's own
+   pixel coordinates, holding one group per annotation. */
+.art-shot .art-ann {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   cursor: crosshair;
   touch-action: none;
+  overflow: visible;
 }
-/* The outline layer only shows strokes; the stroke layer above it takes
-   the pointer. */
-.art-shot canvas[aria-hidden] {
+.art-ann[data-tool="select"] {
+  cursor: default;
+}
+.art-ann[data-tool="select"] .art-ann-item {
+  cursor: move;
+}
+.art-ann polyline,
+.art-ann path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* A wide, invisible stroke along each line, so a thin line is easy to
+   click. */
+.art-ann .art-ann-hit {
+  stroke: transparent;
+  pointer-events: stroke;
+}
+.art-ann-number {
+  font-family: system-ui, sans-serif;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
   pointer-events: none;
+}
+/* The selected annotation's outline, and the keyboard focus ring. Our own
+   drawing surface: no component covers it. */
+.art-ann-item:focus {
+  outline: none;
+}
+.art-ann-selection {
+  fill: none;
+  stroke: var(--recursica_brand_states_focus_color);
+  stroke-width: 2px;
+  stroke-dasharray: 6 4;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+.art-ann-item:focus-visible .art-ann-selection {
+  stroke-width: 3px;
+  stroke-dasharray: none;
 }
 
 /* Pen colour swatches: beside each colour's name in the pen color

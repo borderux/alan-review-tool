@@ -1,3 +1,4 @@
+import type { Annotation } from "./annotations";
 import type { RecursicaDetection } from "./recursica";
 
 // The stored shape of a review session. This is exactly what already sits
@@ -17,6 +18,14 @@ export interface ReviewComment {
   // optional). Its pixels divided by this are its natural size in CSS px.
   // Missing on older comments: the current device pixel ratio is used.
   screenshotScale?: number;
+  // A comment with annotations keeps two images (added later; optional):
+  // `screenshot` is then the annotated image, rendered from
+  // `screenshotClean` (the screenshot as captured) plus `annotations` (the
+  // objects, so they stay editable). A comment without annotations has
+  // `screenshot` only. Older sessions - one image, perhaps with a drawing
+  // already baked in, and no objects - load unchanged.
+  screenshotClean?: string;
+  annotations?: Annotation[];
 }
 
 // An element picked from the page, like the browser's element inspector.

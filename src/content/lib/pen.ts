@@ -1,4 +1,12 @@
-import type { PenColor } from "./storage";
+export const PEN_COLORS = [
+  "red",
+  "white",
+  "black",
+  "green",
+  "blue",
+  "yellow",
+] as const;
+export type PenColor = (typeof PEN_COLORS)[number];
 
 // The annotation pen's colours. They are drawn into the screenshot itself,
 // so they are fixed values: a theme colour would be baked in as whatever
