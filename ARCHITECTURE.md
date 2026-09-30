@@ -376,12 +376,15 @@ JavaScript at all (a deliberate constraint, not an oversight), and not
 rendered with React:
 
 - **Header** with session start time, comment/page counts, reviewer
-  name/email/details.
+  name/email/details. The page has `lang="en"` and a viewport meta tag, and
+  thumbnails keep each image's shape (at most 64 px tall, never cropped), so
+  wide element strips and tall crops stay recognisable.
 - **Table of contents** linking to each page section by anchor.
 - **One section per page**, in the order first touched, each with a link to
   the page (visible text omits query params for readability; the `href`
   always has the full URL).
-- **Comments**, tight and separated, each labelled "Comment <n>" with the
+- **Comments** in ascending number order within each page (the panel
+  stores and shows them newest first), each labelled "Comment <n>" with the
   plain number in `data-comment-id`. The number is the comment's position,
   1 to N across the session in creation order (see the Data model), so
   it can change when an earlier comment is deleted.
@@ -389,7 +392,8 @@ rendered with React:
   number becomes text, in the panel and the report alike. (Reports from
   before this wrote it as `CM-<n>`.)
 - **A link per comment**, in `p.comment-link`, back to the comment's own
-  page (full `href`, visible text without the query string), so a comment
+  page (full `href`; short, muted visible text: the page's path, plus the
+  `#id` for an element), so a comment
   read on its own still says where it came from. An element comment links
   to `#<id>` on that page only when its element had a simple, unique id at
   capture time: `elementFragmentId()` in `lib/links.ts` accepts only a
@@ -397,7 +401,8 @@ rendered with React:
   id unique in the document, never inside a shadow root) with a plain id
   that the captured HTML's own `id` matches. No fragment is ever made from
   class names or paths. Only http, https and file addresses become links.
-- **Element comments** also show the captured element: its selector and
+- **Element comments** also show the captured element under a visible
+  "Element" label (`p.element-label`): its selector and
   viewport, then its HTML and styles in collapsible `<details>` sections
   (no JavaScript needed), all escaped.
 - **Screenshots** as 50x50 thumbnails, paired with a full-resolution image

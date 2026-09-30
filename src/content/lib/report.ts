@@ -32,7 +32,9 @@ function elementHtml(el: CapturedElement): string {
   const styles = Object.entries(el.styles)
     .map(([name, value]) => `${name}: ${value};`)
     .join("\n");
-  return `<div class="comment-element"><p class="element-selector"><code>${escapeHtml(el.selector)}</code></p><p class="element-meta">Viewport ${formatCount(el.viewport.width)} × ${formatCount(el.viewport.height)}</p>${notes.map((n) => `<p class="element-note">${escapeHtml(n)}</p>`).join("")}<details class="element-html"><summary>HTML</summary><pre><code>${escapeHtml(el.html)}</code></pre></details><details class="element-styles"><summary>Styles</summary><pre><code>${escapeHtml(styles)}</code></pre></details></div>`;
+  // A visible "Element" label first, so a person can tell what the
+  // selector line below it is.
+  return `<div class="comment-element"><p class="element-label">Element</p><p class="element-selector"><code>${escapeHtml(el.selector)}</code></p><p class="element-meta">Viewport ${formatCount(el.viewport.width)} × ${formatCount(el.viewport.height)}</p>${notes.map((n) => `<p class="element-note">${escapeHtml(n)}</p>`).join("")}<details class="element-html"><summary>HTML</summary><pre><code>${escapeHtml(el.html)}</code></pre></details><details class="element-styles"><summary>Styles</summary><pre><code>${escapeHtml(styles)}</code></pre></details></div>`;
 }
 
 // A page's Recursica line: what was detected about the reviewed page (not
@@ -77,6 +79,17 @@ function recursicaLine(d: RecursicaDetection | undefined): string {
   return `<p class="page-recursica" ${attrs}>Recursica: ${parts.join(", ")}</p>`;
 }
 
+// A comment link's visible text: the path (the site's root is "/") and
+// the fragment, without the origin or the query string.
+function shortLinkText(href: string): string {
+  try {
+    const url = new URL(href);
+    return `${url.pathname}${url.hash}`;
+  } catch {
+    return href;
+  }
+}
+
 export function totalCommentCount(session: Session | null): number {
   if (!session) return 0;
   return Object.values(session.pages).reduce(
@@ -116,7 +129,10 @@ export function buildReportHtml({
 
   const pagesHtml = pages
     .map(([url, page], i) => {
-      const commentsHtml = page.comments
+      // Oldest first: ascending comment number, the order they were made.
+      // (Each page stores its comments newest first, for the panel.)
+      const commentsHtml = [...page.comments]
+        .sort((a, b) => a.commentNumber - b.commentNumber)
         .map((comment) => {
           let shotsHtml = "";
           // The lightbox target lives at the end of the document; :target
@@ -139,11 +155,12 @@ export function buildReportHtml({
             : "";
           // Every comment links back to its own page, so a comment read on
           // its own still says where it came from - an element comment to
-          // the element itself when it had a simple, unique id. The visible
-          // text drops the query string, like the page heading; the href
-          // keeps the full address.
+          // the element itself when it had a simple, unique id. The href
+          // keeps the full address; the visible text is short and muted -
+          // the page's path, plus the #id for an element - since the page
+          // heading above already shows the full address.
           const href = commentHref(url, comment.element);
-          const linkText = href ? href.replace(/\?[^#]*/, "") : "";
+          const linkText = href ? shortLinkText(href) : "";
           const linkHtml = href
             ? `<p class="comment-link"><a href="${escapeHtml(href)}">${escapeHtml(linkText)}</a></p>`
             : "";
@@ -164,9 +181,10 @@ ${commentsHtml}
     .join("\n");
 
   return `<!doctype html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Snippy report</title>
 ${session?.guid ? `<meta name="snippy-session-id" content="${escapeHtml(session.guid)}">` : ""}
 <meta name="snippy-version" content="${escapeHtml(__APP_VERSION__)}">

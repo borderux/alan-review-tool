@@ -45,7 +45,7 @@ JavaScript in what you export.
 - **Exports a single, self-contained HTML report** — header, table of
   contents, one section per page, tight comment list, a link on every
   comment back to its page (to the element itself when it has a simple,
-  unique id), 50×50 thumbnails
+  unique id), thumbnails that keep each image's shape
   with a full-resolution lightbox. The lightbox is pure CSS (`:target`,
   no JavaScript at all); the whole report has zero `<script>` tags.
 - **Comments are numbered 1 to N** across the session, in the order they
