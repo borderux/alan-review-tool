@@ -12,6 +12,7 @@ import {
 } from "@recursica/adapter-mantine-v8";
 import { elementSummary } from "../lib/element";
 import { commentName, formatCommentId } from "../lib/ids";
+import { ariaShortcut, withShortcut } from "../lib/shortcuts";
 import type { ReviewComment } from "../lib/types";
 import { fieldLayout, type FormLayout } from "../ReviewPanel";
 
@@ -92,15 +93,16 @@ export function CommentItem({
       variant="outline"
       size="small"
       aria-label={`Add annotations to ${name}`}
+      aria-keyshortcuts={ariaShortcut("annotate")}
       data-shot-edit={comment.id}
       onClick={onAnnotate}
     >
-      Add annotations
+      {withShortcut("Add annotations", "annotate")}
     </Button>
   );
 
   return (
-    <li className="art-row" ref={rowRef}>
+    <li className="art-row" ref={rowRef} data-comment-row={comment.id}>
       {/* The number and the actions share the first row inside the card's
           content, rather than a Card.Header, whose own padding and divider
           make every card much taller. Then the Comment field, then the
@@ -134,12 +136,13 @@ export function CommentItem({
                 )}
                 {/* Dedicated buttons instead of a menu (owner decision).
                     Delete still asks first. */}
-                <Tooltip label="Duplicate comment">
+                <Tooltip label={withShortcut("Duplicate comment", "duplicate")}>
                   <Button
                     variant="outline"
                     size="small"
                     icon={<Copy />}
                     aria-label={`Duplicate ${name}`}
+                    aria-keyshortcuts={ariaShortcut("duplicate")}
                     data-duplicate={comment.id}
                     onClick={onDuplicate}
                   />

@@ -24,6 +24,7 @@ import { captureElement, captureRegion } from "./lib/capture";
 import { plural } from "./lib/format";
 import { commentName } from "./lib/ids";
 import { detectRecursica } from "./lib/recursica";
+import { matchShortcut, type ShortcutId } from "./lib/shortcuts";
 import {
   CLOSE_EVENT,
   currentPageKey,
@@ -356,6 +357,69 @@ export function ReviewPanel({
     setToast(null);
     setFocusId(review.duplicateComment(commentPage, comment));
   };
+
+  // The comment whose text box has focus, if any (the shortcuts that act
+  // on one comment act on it).
+  const focusedComment = (): {
+    pageKey: string;
+    comment: ReviewComment;
+  } | null => {
+    const el = host.shadowRoot?.activeElement;
+    if (!(el instanceof HTMLTextAreaElement)) return null;
+    const id = Number(
+      el.closest("li[data-comment-row]")?.getAttribute("data-comment-row"),
+    );
+    for (const [key, page] of Object.entries(session?.pages ?? {})) {
+      const comment = page.comments.find((c) => c.id === id);
+      if (comment) return { pageKey: key, comment };
+    }
+    return null;
+  };
+
+  const runShortcut = (id: ShortcutId) => {
+    if (id === "addComment") handleAddComment();
+    else if (id === "addScreenshot") void handleAddScreenshot();
+    else if (id === "addElement") void handleAddElement();
+    else if (id === "pageOnly" && total > 0) {
+      setPageOnly(!pageOnly);
+      review.track(savePageOnly(!pageOnly));
+    } else if (id === "showImages" && total > 0) {
+      setShowImages(!showImages);
+      review.track(saveShowImages(!showImages));
+    } else if (id === "duplicate") {
+      const f = focusedComment();
+      if (f) handleDuplicate(f.pageKey, f.comment);
+    } else if (id === "annotate") {
+      const f = focusedComment();
+      if (f?.comment.screenshot)
+        setAnnotating({ pageKey: f.pageKey, id: f.comment.id });
+    }
+  };
+  const shortcutRef = useRef(runShortcut);
+  useEffect(() => {
+    shortcutRef.current = runShortcut;
+  });
+  // Whether a shortcut may run now: never while a modal (the annotation
+  // editor, a confirmation, the download dialog) is open, while a capture
+  // is under way, or when saved data could not be loaded.
+  const shortcutsLive =
+    !modalOpen && captureTarget == null && !loadFailed && opened;
+
+  // One listener for the whole window, in the capture phase, so the keys
+  // work with focus on the page or in the panel, and the page never sees
+  // a key the panel handled. Only a matching combination is consumed.
+  useEffect(() => {
+    if (!shortcutsLive) return;
+    const onKey = (event: KeyboardEvent) => {
+      const id = matchShortcut(event);
+      if (!id) return;
+      event.preventDefault();
+      event.stopPropagation();
+      shortcutRef.current(id);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [shortcutsLive]);
 
   // Download report: save what the reviewer entered (name and email under
   // their own keys, session details in the session, as before), then build

@@ -194,6 +194,47 @@ Because every stylesheet is inlined, `content.js` is large (about 2 MB,
 most of it the theme's CSS variables). It is read from the local
 extension package on each click, never downloaded.
 
+## Keyboard shortcuts
+
+`lib/shortcuts.ts` holds them; `ReviewPanel.tsx` listens on `window` in the
+capture phase while the panel is open, so they work with focus in the panel
+or on the reviewed page. A combination is consumed (`preventDefault`,
+`stopPropagation`) only when it is one of ours. Nothing runs while a modal
+(the annotation editor, a confirmation, the download dialog) is open, while
+a capture is under way, or when saved data could not be loaded. Keys are
+matched by physical key (`event.code`), so every layout works the same;
+key repeat and IME composition (`isComposing`, key code 229) are ignored.
+
+| Function                                            | macOS | Windows, Linux, ChromeOS |
+| --------------------------------------------------- | ----- | ------------------------ |
+| Add comment                                         | ⌃⇧C   | Alt+Shift+C              |
+| Add screenshot (new comment)                        | ⌃⇧S   | Alt+Shift+S              |
+| Add element (new comment)                           | ⌃⇧L   | Alt+Shift+L              |
+| Duplicate the focused comment                       | ⌃⇧D   | Alt+Shift+D              |
+| Add annotations to the focused comment's screenshot | ⌃⇧O   | Alt+Shift+O              |
+| Only view comments for this url (toggle)            | ⌃⇧U   | Alt+Shift+U              |
+| Show screenshot thumbnails (toggle)                 | ⌃⇧M   | Alt+Shift+M              |
+| Open or close Snippy (browser command)              | ⌃⇧K   | Alt+Shift+K              |
+
+Why these modifiers: on macOS, Command combinations belong to the browser
+and the system, and Option combinations type characters; Control+Shift
+with these letters is not a macOS, Chrome or Firefox shortcut, and not one
+of the Control text-editing keys (which are Control+A/E/B/F/N/P/K/D/H/T/O/Y
+and their Shift forms select). On Windows and Linux, Control+Shift is full
+of browser shortcuts (developer tools on C, E, I, J, K, M; Firefox's
+screenshot on S; paste as plain text on V; redo on Z), while Alt+Shift with
+these letters is free in Chrome and Firefox; Control is required to be up,
+so AltGr (which arrives as Control+Alt) never matches. Known overlaps: a
+page's own `accesskey` on one of these letters (Firefox on Windows and
+Linux uses Alt+Shift for access keys) is taken while the panel is open, and
+a web app that binds the same combination loses it while the panel is open.
+
+The browser command (`commands._execute_action` in both manifests) opens
+and closes Snippy like the toolbar button. Chrome applies the suggested key
+only when the extension is installed and the key is free; the reviewer can
+change it at `chrome://extensions/shortcuts` (Firefox: Manage Extension
+Shortcuts in the add-ons page).
+
 ## Adapter workarounds
 
 Owner policy: when the adapter or theme misbehaves, that is an adapter bug,

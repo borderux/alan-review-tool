@@ -36,6 +36,14 @@ JavaScript in what you export.
 - **Built on the Recursica design system** (React, TypeScript and the
   Recursica Mantine adapter, with the default Recursica Forge theme), in
   light or dark mode following your operating system.
+- **Keyboard shortcuts** while the panel is open, shown after each label:
+  add a comment, screenshot or element, duplicate or annotate the focused
+  comment, and the two view options (Control+Shift on a Mac, Alt+Shift
+  elsewhere; see ARCHITECTURE.md). A browser shortcut, Alt+Shift+K
+  (⌃⇧K on a Mac), opens and closes Snippy; Chrome applies it only on
+  install and if it is free, and you can change it at
+  `chrome://extensions/shortcuts` (Firefox: the add-ons page, Manage
+  Extension Shortcuts).
 - **Resizable panel** (400 to 720 px, 440 by default) that remembers its
   width (drag the left edge, or
   focus it and use the arrow keys). Download report (all n comments,

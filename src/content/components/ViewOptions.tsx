@@ -1,4 +1,5 @@
 import { Checkbox } from "@recursica/adapter-mantine-v8";
+import { ariaShortcut, withShortcut } from "../lib/shortcuts";
 
 interface ViewOptionsProps {
   // No comments in the session: nothing to filter (owner decision).
@@ -46,12 +47,16 @@ export function ViewOptions({
     >
       <Checkbox
         value={PAGE_ONLY}
-        label="Only view comments for this url"
+        label={withShortcut("Only view comments for this url", "pageOnly")}
+        aria-label="Only view comments for this url"
+        aria-keyshortcuts={ariaShortcut("pageOnly")}
         disabled={disabled}
       />
       <Checkbox
         value={SHOW_IMAGES}
-        label="Show screenshot thumbnails"
+        label={withShortcut("Show screenshot thumbnails", "showImages")}
+        aria-label="Show screenshot thumbnails"
+        aria-keyshortcuts={ariaShortcut("showImages")}
         disabled={disabled}
       />
     </Checkbox.Group>

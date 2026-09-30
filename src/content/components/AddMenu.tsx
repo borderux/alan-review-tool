@@ -1,5 +1,6 @@
 import { Plus, X } from "@phosphor-icons/react";
 import { Button, Menu, Tooltip } from "@recursica/adapter-mantine-v8";
+import { ariaShortcut, withShortcut } from "../lib/shortcuts";
 import { useManagedMenu } from "./useManagedMenu";
 
 interface AddMenuProps {
@@ -49,11 +50,30 @@ export function AddMenu({
         </Menu.Target>
       </Tooltip>
       <Menu.Dropdown onKeyDown={onDropdownKeyDown}>
-        <Menu.Item ref={firstItemRef} onClick={onAddComment}>
-          Comment
+        {/* Each item shows its shortcut after its label; the accessible
+            name stays the plain label, and aria-keyshortcuts carries it. */}
+        <Menu.Item
+          ref={firstItemRef}
+          aria-label="Comment"
+          aria-keyshortcuts={ariaShortcut("addComment")}
+          onClick={onAddComment}
+        >
+          {withShortcut("Comment", "addComment")}
         </Menu.Item>
-        <Menu.Item onClick={onAddScreenshot}>Screenshot</Menu.Item>
-        <Menu.Item onClick={onAddElement}>Element</Menu.Item>
+        <Menu.Item
+          aria-label="Screenshot"
+          aria-keyshortcuts={ariaShortcut("addScreenshot")}
+          onClick={onAddScreenshot}
+        >
+          {withShortcut("Screenshot", "addScreenshot")}
+        </Menu.Item>
+        <Menu.Item
+          aria-label="Element"
+          aria-keyshortcuts={ariaShortcut("addElement")}
+          onClick={onAddElement}
+        >
+          {withShortcut("Element", "addElement")}
+        </Menu.Item>
       </Menu.Dropdown>
     </Menu>
   );
