@@ -16,6 +16,24 @@ const ICON_SIZES = [16, 32, 48, 128];
 const ICONS_DIR = path.join(SRC, "icons");
 const iconFile = (size) => `icon-${size}.png`;
 
+// package.json's version is the only source of truth: the manifests carry
+// none in src, and each built manifest gets it here. Browsers need one to
+// four dot-separated integers (0-65535) - a prerelease or build suffix
+// (1.2.0-beta.1) is refused rather than silently mapped.
+const { version } = JSON.parse(
+  fs.readFileSync(path.join(ROOT, "package.json"), "utf8"),
+);
+if (
+  !/^\d+(\.\d+){0,3}$/.test(version) ||
+  version.split(".").some((part) => Number(part) > 65535 || /^0\d/.test(part))
+) {
+  throw new Error(
+    `package.json version "${version}" is not a valid extension version: ` +
+      "browsers accept only 1 to 4 dot-separated integers (like 1.2.3), " +
+      "with no prerelease or build suffix.",
+  );
+}
+
 const TARGETS = {
   chrome: "manifest.chrome.json",
   firefox: "manifest.firefox.json",
@@ -59,6 +77,15 @@ async function main() {
     const manifest = JSON.parse(
       fs.readFileSync(path.join(SRC, manifestFile), "utf8"),
     );
+    if ("version" in manifest) {
+      throw new Error(
+        `${manifestFile} has its own "version"; remove it - the build writes package.json's.`,
+      );
+    }
+    // Right after the name, where browsers and people expect it.
+    const { manifest_version, name, ...rest } = manifest;
+    Object.keys(manifest).forEach((key) => delete manifest[key]);
+    Object.assign(manifest, { manifest_version, name, version, ...rest });
     if (missingIcons.length > 0) {
       delete manifest.icons;
       delete manifest.action.default_icon;
@@ -75,6 +102,30 @@ async function main() {
       path.join(outDir, "manifest.json"),
       `${JSON.stringify(manifest, null, 2)}\n`,
     );
+  }
+
+  // Guard: every built manifest, and the panel itself, must carry exactly
+  // package.json's version.
+  for (const browser of Object.keys(TARGETS)) {
+    const built = JSON.parse(
+      fs.readFileSync(path.join(DIST, browser, "manifest.json"), "utf8"),
+    );
+    if (built.version !== version) {
+      throw new Error(
+        `dist/${browser}/manifest.json says ${built.version}, package.json says ${version}`,
+      );
+    }
+    const content = fs.readFileSync(
+      path.join(DIST, browser, "content.js"),
+      "utf8",
+    );
+    // As a string literal in any quote style the minifier picked.
+    const literal = new RegExp(`["'\`]${version.replace(/\./g, "\\.")}["'\`]`);
+    if (!literal.test(content)) {
+      throw new Error(
+        `dist/${browser}/content.js does not carry version ${version}`,
+      );
+    }
   }
 
   fs.rmSync(path.join(DIST, ".content"), { recursive: true, force: true });

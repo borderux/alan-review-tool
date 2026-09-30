@@ -578,6 +578,16 @@ instructions.
    files. `npm run icons -- <source.png>` (`scripts/make-icons.mjs`)
    generates the four sizes from one PNG, with no dependencies beyond
    Node's built-in `zlib`.
+3. **Writes the version.** `package.json`'s `version` is the only source of
+   truth (Changesets bumps only it). The source manifests carry no
+   version; the build writes it into each built manifest, right after the
+   name. Browsers accept only one to four dot-separated integers, so a
+   prerelease or build suffix (`1.2.0-beta.1`) fails the build with a clear
+   message rather than being mapped. The build then checks that both built
+   manifests and the built `content.js` carry exactly that version, and
+   fails if not. The release zips (`scripts/package-extension.mjs`) are
+   named from the same `package.json` version. (Before round 17 the source
+   manifests hard-coded 0.1.0 while the code said 0.2.0.)
 
 Type checking is `npm run typecheck`: `tsconfig.json` covers the panel,
 `tsconfig.node.json` covers `vite.config.mts`.

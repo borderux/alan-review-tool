@@ -2,6 +2,16 @@
   "name": "snippy",
   "private": true,
   "version": "0.2.0",
+  "description": "Snippy by Recursica: capture comments, screenshots and page elements on any website, annotate them, and export one HTML report.",
+  "homepage": "https://recursica.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/borderux/snippy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/borderux/snippy/issues"
+  },
+  "author": "Recursica",
   "scripts": {
     "build": "npm run lint && node build.js",
     "icons": "node scripts/make-icons.mjs",

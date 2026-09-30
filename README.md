@@ -5,6 +5,14 @@ feedback on any website. Click the toolbar icon on any tab and a slide-out
 panel appears — no changes needed on the target site, no backend, and no
 JavaScript in what you export.
 
+## About
+
+Snippy is made by [Recursica](https://recursica.com). The source is at
+[github.com/borderux/snippy](https://github.com/borderux/snippy); report
+problems in its [issues](https://github.com/borderux/snippy/issues). The
+version comes from `package.json` alone: the build writes it into both
+browser manifests and the panel, and fails if they would differ.
+
 ## Features
 
 - **Works on any site, in either browser** — injected via `activeTab` +
