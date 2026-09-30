@@ -61,8 +61,8 @@ browser manifests and the panel, and fails if they would differ.
   Extension Shortcuts).
 - **Resizable panel** (400 to 720 px, 440 by default) that remembers its
   width (drag the left edge, or
-  focus it and use the arrow keys). Download report (all n, with a chat icon for
-  "comments", counting every page) asks for the
+  focus it and use the arrow keys). Download report (its tooltip says how
+  many comments across how many pages) asks for the
   reviewer's name, email and session details each time, prefilled with
   the last values used.
 - **Exports a single, self-contained HTML report** — header, table of

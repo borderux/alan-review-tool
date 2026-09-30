@@ -35,7 +35,7 @@ Recursica design system and bundled by Vite into one content script;
   - `App.tsx` - the Mantine provider, configured for the shadow root, and
     the Recursica layer-0 scope.
   - `ReviewPanel.tsx` - the panel shell: open/close, Escape, focus, the
-    footer (Start over, Download report (all n, then a chat icon), which wraps onto two lines only at 400 px with a four-digit count), toast and modals, and the
+    footer (Start over, Download report - with a tooltip and description saying how many comments across how many pages the report holds), toast and modals, and the
     failed-load state (storage could not be read: the panel opens empty,
     Add disabled, with a message in its body).
   - `components/` - the one view (`CommentList`: the current page's
@@ -54,9 +54,9 @@ Recursica design system and bundled by Vite into one content script;
     are downloaded), the annotation editor (a fixed toolbar with the tool
     control - Select, Pen, Arrow, Numbered dot, the kit's segmented control
     - the pen color dropdown and Clear annotations above a bordered,
-      scrolling image; annotations are SVG objects over the image that can be
+      scrolling image; annotations are SVG objects over the image. A new one is left unselected, so the add tool (Pen, Arrow, Numbered dot) keeps adding; with the Select tool they are tab stops and can be
       selected, dragged, moved with the arrow keys, deleted with Delete or
-      Backspace, and undone and redone with Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z; its own confirmations - discard drawing, clear annotations,
+      Backspace, and undone and redone with Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z; its own confirmations - discard changes, clear annotations,
       delete screenshot - stack on it), the shared confirmation modal, the
       resize strip,
       and `useManagedMenu` (menu focus handling that works in a shadow root).
@@ -312,15 +312,20 @@ Kept, our own elements that no component covers (tokens only, owner-requested):
 
 Owner-approved exceptions, not adapter bugs (rounds 13, 16 and 18):
 
+- `AnnotationEditor.tsx` the pen color dropdown has no visible label, only its accessible name "Pen color" (`aria-label`, which the kit's field accepts), so the editor's toolbar - tools, color, Clear annotations - sits on one line (round 19). The label rules say no label is visually hidden.
+- `AnnotationEditor.tsx` the tool control's items are icons (Phosphor `Cursor`, `PencilSimple`, `ArrowDownLeft`, `NumberCircleOne`). The kit's SegmentedControl items take a `label` (any content), a `value`, `disabled` and an `icon`, but no tooltip or separate accessible name. So each item's label is the icon with `role="img"` and `aria-label` (the item's name), wrapped in the kit's Tooltip, opened from the control's own hover and focus events (the item's radio is hidden, so the Tooltip can't see its focus). The tooltip renders in the modal's layer-1 portal, above the modal; Escape hides it first, then closes the editor. The chosen tool's icon is filled as well as highlighted. Gap: "SegmentedControl items have no tooltip or accessible-name option."
+- The kit's own icon-only close buttons (the Panel's, each Modal's and the Toast's X) have accessible names but no tooltip; the kit offers no tooltip on them. Gap: "Close buttons have no tooltip."
+- The pen color field keeps the kit's 8 px bottom margin (the form's gap between fields) even alone in the toolbar, so its box sits 4 px above the tools' and Clear's shared centre line. Not overridden. Gap: "A standalone field still carries the form's bottom margin."
+
 - Kept as they are, by owner decision (round 18): the visible "View" group label above the two checkboxes; no element link in the panel's cards (the page and element links are in the report); the error toast at the top-left of the page (the adapter's Toast has no placement - its gap stays filed); confirmation text at the full dialog width; no Add screenshot button on another page's comment (a new screenshot would capture the page that is open, not that comment's page); the failed-load message in the panel body; page links in the same tab and page titles at link size; no heading trim in Firefox until it supports it; Snippy's Alt+Shift shortcuts taking priority over a page's own access keys in Firefox on Windows and Linux; the manifest `author` string (Chrome ignores it, Firefox reads it); and the suggested browser shortcut Alt+Shift+K.
 
 - `panel.css` token remap block also sets `--recursica_ui-kit_components_textarea_properties_rows` (Forge: 4) to 1 (approved by the owner in round 18), so every text box starts at one row and grows and shrinks with its text (with the kit's `autosize`). Gap: "TextArea should allow rows/min-height to be set by the consumer."
 - `AnnotationEditor.tsx` a flexible spacer in `Modal.Footer` (`<Group flex={1} aria-hidden />`) puts the rarely used Delete screenshot at the bottom left, apart from Cancel and Save (re-added in round 16). Gap: "Modal.Footer has no slot for a rarely used action on the left."
 - Several solid buttons on one surface: the header Add, a card's Add screenshot, and Download report.
 - A comment is never deleted for being blank; only Delete (with its confirmation) removes one. Blank comments count, and are in the report.
-- The footer's label "Download report (all n [chat icon])" - a decorative Phosphor `ChatCircle` after the count, with the accessible name "Download report, all n comments" - names the whole report, not just the comments showing. The kit's Button has a leading-icon slot only, so the icon sits in the label, sized to the text (`.art-label-icon` aligns it). Gap: "Button has no trailing-icon slot for an icon inside the label."
+- The footer button reads just "Download report" (owner decision, round 19). A tooltip on hover and keyboard focus, also the button's description (`aria-describedby`), says what the report holds for the whole session: "12 comments across 3 pages". With no comments the button is disabled and has none (a disabled button gets no pointer or focus events).
 
-- `panel.css` token remap block on `.art-root` - owner-requested token remap. The panel body's content padding (`--recursica_ui-kit_components_panel_properties_content-horizontal-padding`, 24 px, and `...content-vertical-padding`, 16 px) and the card padding (`--recursica_ui-kit_components_card_properties_padding`, 24 px) are re-pointed to the brand's general default dimension (`--recursica_brand_dimensions_general_default`, 8 px; round 13 used general small, 4 px, which the owner found too tight); the card radius for layer 0 (`--recursica_ui-kit_modes_light_layer_0_components_card_properties_borders_border-radius` and the `dark` twin, 24 px via the brand's layer-1 radius) is set to 12 px, which no theme radius token equals. No element is styled; only these token values change. Their proper home is the Forge theme's ui-kit values; remove the block once Forge carries them.
+- `panel.css` token remap block on `.art-root` - owner-requested token remap. The panel body's content padding is `--recursica_brand_dimensions_general_lg` (16 px) on all four sides (round 19): `--recursica_ui-kit_components_panel_properties_content-horizontal-padding` (Forge: general_xl, 24 px) is re-pointed to general_lg, and `...content-vertical-padding` (Forge: already general_lg) is set explicitly so the four sides read alike. The card padding (`--recursica_ui-kit_components_card_properties_padding`, Forge 24 px) is re-pointed to the brand's general default dimension (`--recursica_brand_dimensions_general_default`, 8 px); the card radius for layer 0 (`--recursica_ui-kit_modes_light_layer_0_components_card_properties_borders_border-radius` and the `dark` twin, 24 px via the brand's layer-1 radius) is set to 12 px, which no theme radius token equals. No element is styled; only these token values change. Their proper home is the Forge theme's ui-kit values; remove the block once Forge carries them.
 - `panel.css` `text-box: trim-both cap alphabetic` on the panel title and the card number headings, inside `@supports (text-box-trim: trim-both)` - owner-suggested fix for the theme's heading line-box bug: the header type (Dongle at 56 px, 39.2 px line height) puts the glyphs off the centre of their line box. Trimmed, the title's cap height centres on Add and Close within 0.5 px (was 4.6 px high) and a card number on its buttons within 1 px (was 4.8 px). The header gets 4 px shorter (64 to 60 px) and the number row 1.6 px shorter; descenders still show. Firefox doesn't support it yet and shows the theme's own line box.
 
 Adapter gaps with no workaround (the UI shows the kit's real behaviour):

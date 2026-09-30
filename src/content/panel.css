@@ -14,23 +14,25 @@
 }
 
 /* OWNER-APPROVED EXCEPTION: a token remap, not an override of any element.
-   The owner asked for tighter spacing than the kit's Panel and Card allow
+   The owner asked for spacing the kit's Panel and Card do not offer
    (the adapter strips their padding props) and a 12px card radius, which
    no theme radius token equals. So these few ui-kit token values are
    re-pointed for the panel only, here, in one place. The proper home is
    the Forge theme's ui-kit values; remove this block once Forge carries
    them. See ARCHITECTURE.md, "Adapter workarounds".
-   - panel body padding (24px across, 16px down) -> general default (8px)
+   - panel body padding, left and right (24px, general xl) -> general lg
+     (16px), the same as top and bottom; top and bottom are already general
+     lg in Forge and are set explicitly here so all four sides read alike
    - card padding (24px) -> general default (8px)
    - card corner radius, layer 0 light and dark (the brand's layer-1
      radius, 24px) -> 12px
    - text box minimum rows (4) -> 1, so a text box hugs its text */
 .art-root {
   --recursica_ui-kit_components_panel_properties_content-horizontal-padding: var(
-    --recursica_brand_dimensions_general_default
+    --recursica_brand_dimensions_general_lg
   );
   --recursica_ui-kit_components_panel_properties_content-vertical-padding: var(
-    --recursica_brand_dimensions_general_default
+    --recursica_brand_dimensions_general_lg
   );
   --recursica_ui-kit_components_card_properties_padding: var(
     --recursica_brand_dimensions_general_default
@@ -266,8 +268,9 @@
   }
 }
 
-/* The chat icon inside the Download report label: on the text's line, not
-   below it. (The kit's Button has no slot for an icon inside its label.) */
-.art-label-icon {
-  vertical-align: -0.2em;
+/* A tool's icon in the editor's segmented control, centred in its item. */
+.art-tool-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }

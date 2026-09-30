@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChatCircle } from "@phosphor-icons/react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -9,6 +8,7 @@ import {
   Stack,
   Text,
   Toast,
+  Tooltip,
 } from "@recursica/adapter-mantine-v8";
 import { AddMenu } from "./components/AddMenu";
 import { AnnotationEditor } from "./components/AnnotationEditor";
@@ -22,7 +22,7 @@ import { DownloadModal, type ReportDetails } from "./components/DownloadModal";
 import { ResizeHandle } from "./components/ResizeHandle";
 import { ViewOptions } from "./components/ViewOptions";
 import { captureElement, captureRegion } from "./lib/capture";
-import { formatCount, plural } from "./lib/format";
+import { plural } from "./lib/format";
 import { commentName } from "./lib/ids";
 import {
   commentContextNow,
@@ -74,6 +74,8 @@ type Confirmation =
 // The id of the element holding the failed-load message, which is also
 // the disabled Add button's description.
 const LOAD_ERROR_ID = "art-load-error";
+// The id of the text that describes the Download report button.
+const SUMMARY_ID = "art-report-summary";
 
 interface ReviewPanelProps {
   host: HTMLElement;
@@ -123,6 +125,11 @@ export function ReviewPanel({
 
   const pageKey = usePageKey();
   const total = totalCommentCount(session);
+  const pagesWithComments = Object.values(session?.pages ?? {}).filter(
+    (page) => page.comments.length > 0,
+  ).length;
+  // "12 comments across 3 pages", for the whole session.
+  const reportSummary = `${plural(total, "comment", "comments")} across ${plural(pagesWithComments, "page", "pages")}`;
   const annotateComment =
     annotating == null
       ? null
@@ -629,12 +636,7 @@ export function ReviewPanel({
         */}
         {/* Buttons only, no text (owner decision). */}
         <Panel.Footer>
-          {/* The longer label (owner's) doesn't fit beside Start over below
-              about 470px with a large count. Rather than cut the label
-              short, the footer wraps: Start over stays at the left, and
-              Download report moves to its own line at the bottom right,
-              where the primary action goes. */}
-          <Group justify="space-between" wrap="wrap" gap="rec-sm" w="100%">
+          <Group justify="space-between" wrap="nowrap" gap="rec-sm" w="100%">
             {/* The footer's two buttons are the default size; every other
                 button in the panel is small (owner decision). */}
             <Button
@@ -645,41 +647,33 @@ export function ReviewPanel({
             >
               Start over
             </Button>
-            {/* The count is every comment in the report, on every page -
-                not only the ones showing (owner's label). Left out at
-                zero; the accessible name spells it out. */}
-            <Group ml="auto">
-              <Button
-                variant="solid"
-                disabled={total === 0}
-                data-download="true"
-                aria-label={
-                  total > 0
-                    ? `Download report, all ${plural(total, "comment", "comments")}`
-                    : undefined
-                }
-                onClick={() => setDownloadOpen(true)}
-              >
-                {/* A chat icon stands for "comments" after the count (owner
-                    decision); it is decorative - the accessible name above
-                    says it in words. The kit's Button has a leading-icon
-                    slot only, so the icon sits in the label, sized to the
-                    text. */}
-                {total > 0 ? (
-                  <>
-                    Download report (all {formatCount(total)}{" "}
-                    <ChatCircle
-                      aria-hidden
-                      size="1.15em"
-                      className="art-label-icon"
-                    />
-                    )
-                  </>
-                ) : (
-                  "Download report"
-                )}
+            {/* What the report holds - every comment on every page, not only
+                the ones showing - is in a tooltip (on hover and keyboard
+                focus) and, for assistive technology, the button's
+                description. With no comments the button is disabled and
+                has none: a disabled button gets no pointer or focus events,
+                and there is nothing to summarise. */}
+            {total > 0 ? (
+              <Tooltip label={reportSummary}>
+                <Button
+                  variant="solid"
+                  data-download="true"
+                  aria-describedby={SUMMARY_ID}
+                  onClick={() => setDownloadOpen(true)}
+                >
+                  Download report
+                </Button>
+              </Tooltip>
+            ) : (
+              <Button variant="solid" disabled data-download="true">
+                Download report
               </Button>
-            </Group>
+            )}
+            {total > 0 && (
+              <span id={SUMMARY_ID} className="art-sr-only">
+                {reportSummary}
+              </span>
+            )}
           </Group>
         </Panel.Footer>
       </Panel>

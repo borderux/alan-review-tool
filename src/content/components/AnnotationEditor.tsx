@@ -4,12 +4,19 @@ import type {
   PointerEvent as ReactPointerEvent,
 } from "react";
 import {
+  ArrowDownLeft,
+  Cursor,
+  NumberCircleOne,
+  PencilSimple,
+} from "@phosphor-icons/react";
+import {
   Button,
   Dropdown,
   Group,
   Modal,
   SegmentedControl,
   Stack,
+  Tooltip,
 } from "@recursica/adapter-mantine-v8";
 import {
   ARROW_LENGTH_PX,
@@ -52,11 +59,14 @@ interface AnnotationEditorProps {
 type EditorConfirmation = "discard" | "clear" | "delete";
 
 type Tool = "select" | "pen" | "arrow" | "dot";
-const TOOLS: { value: Tool; label: string }[] = [
-  { value: "select", label: "Select" },
-  { value: "pen", label: "Pen" },
-  { value: "arrow", label: "Arrow" },
-  { value: "dot", label: "Numbered dot" },
+// Each tool is an icon; its name is the item's accessible name and its
+// tooltip. The chosen tool's icon is filled as well as highlighted, so the
+// selection is never shown by colour alone.
+const TOOLS: { value: Tool; label: string; Icon: typeof Cursor }[] = [
+  { value: "select", label: "Select", Icon: Cursor },
+  { value: "pen", label: "Pen", Icon: PencilSimple },
+  { value: "arrow", label: "Arrow", Icon: ArrowDownLeft },
+  { value: "dot", label: "Numbered dot", Icon: NumberCircleOne },
 ];
 const KIND_NAME: Record<Annotation["kind"], string> = {
   stroke: "Pen stroke",
@@ -186,6 +196,15 @@ export function AnnotationEditor({
   const [past, setPast] = useState<Annotation[][]>([]);
   const [future, setFuture] = useState<Annotation[][]>([]);
   const [tool, setTool] = useState<Tool>("pen");
+  const [toolTip, setToolTip] = useState<Tool | null>(null);
+  useEffect(() => {
+    if (toolTip == null) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setToolTip(null);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [toolTip]);
   const [selected, setSelected] = useState<number | null>(null);
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -199,7 +218,9 @@ export function AnnotationEditor({
     moved: boolean;
   } | null>(null);
   const saveReasonId = useId();
+  // Changed since the last save (undoing back to it is not a change).
   const dirty = JSON.stringify(list) !== initial;
+  const hasSaved = initial !== "[]";
   // While the pen color list is open, Escape belongs to the list: it closes
   // the list, not the whole editor (which would throw the drawing away).
   // Mantine closes the modal from a capture listener on window, before the
@@ -324,8 +345,9 @@ export function AnnotationEditor({
             y: p.y,
             size: (DOT_RADIUS_PX * p.scale) / size.w,
           };
+    // A new annotation is left unselected: the add tool stays active, and
+    // the next click adds another. Selecting needs the Select tool.
     commit([...list, placed]);
-    setSelected(list.length);
   };
 
   const onPointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
@@ -408,20 +430,22 @@ export function AnnotationEditor({
 
   const confirmationCopy = {
     discard: {
-      title: "Discard drawing?",
-      consequence:
-        "Your changes to the annotations on this screenshot will be lost. This can't be undone.",
-      confirmLabel: "Discard drawing",
+      title: "Discard changes?",
+      consequence: hasSaved
+        ? "Changes to the annotations since you last saved will be lost. Saved annotations stay."
+        : "The annotations you added will be lost.",
+      confirmLabel: "Discard changes",
     },
     clear: {
       title: "Clear annotations?",
-      consequence:
-        "Every annotation on this screenshot will be removed. Undo can bring them back while the editor is open.",
+      consequence: hasSaved
+        ? "All annotations in the editor will be removed. Undo brings them back while the editor is open, and your saved annotations come back if you discard your changes."
+        : "All annotations in the editor will be removed. Undo brings them back while the editor is open.",
       confirmLabel: "Clear annotations",
     },
     delete: {
       title: `Delete the screenshot from ${id}?`,
-      consequence: `The screenshot and its annotations will be deleted from ${id}. The comment text stays. This can't be undone.`,
+      consequence: `The screenshot and all its annotations, saved or not, will be deleted from ${id}. The comment text stays. This can't be undone.`,
       confirmLabel: "Delete screenshot",
     },
   } as const;
@@ -478,7 +502,9 @@ export function AnnotationEditor({
       // Every open modal hears Escape (Mantine listens on window), so while
       // a confirmation is open over the editor, Escape is the
       // confirmation's alone: it cancels the confirmation, nothing more.
-      closeOnEscape={!penListOpen && confirmation == null}
+      // While a tool's tooltip shows, the first Escape only hides it (the
+      // tooltip rules); the next one closes the editor as usual.
+      closeOnEscape={!penListOpen && confirmation == null && toolTip == null}
       // Focus return is done by the panel: inside a shadow root, Mantine
       // records the host element as the trigger.
       returnFocus={false}
@@ -486,20 +512,66 @@ export function AnnotationEditor({
     >
       <Stack gap="rec-default" ref={bodyRef} onKeyDown={onKeyDown}>
         {/* The toolbar stays put; only the image area beneath it scrolls.
+            It spans the editor: tools at the left, the pen color in the
+            middle, Clear annotations at the right, all centred on one line.
             The tool is a short exclusive choice laid out in a row, so it is
-            the kit's segmented control. */}
-        <Group align="flex-end" gap="rec-default" wrap="wrap">
+            the kit's segmented control, with an icon per item. */}
+        <Group
+          justify="space-between"
+          align="center"
+          gap="rec-default"
+          wrap="wrap"
+          w="100%"
+        >
           <SegmentedControl
             aria-label="Tool"
-            data={TOOLS}
+            data={TOOLS.map(({ value, label, Icon }) => ({
+              value,
+              // The item's name is the icon's label; its tooltip shows on
+              // hover and whenever the item has keyboard focus (the kit's
+              // tooltip can't see focus on the item's hidden radio, so it
+              // is opened from the control's own focus events).
+              label: (
+                <Tooltip
+                  label={label}
+                  opened={toolTip === value}
+                  // With the modal (layer 1), above it - not in the page-level
+                  // portal underneath the modal.
+                  portalProps={{ target }}
+                >
+                  <span
+                    className="art-tool-icon"
+                    onMouseEnter={() => setToolTip(value)}
+                    onMouseLeave={() => setToolTip(null)}
+                  >
+                    <Icon
+                      role="img"
+                      aria-label={label}
+                      weight={tool === value ? "fill" : "regular"}
+                      size="1.25em"
+                    />
+                  </span>
+                </Tooltip>
+              ),
+            }))}
             value={tool}
+            onFocus={(event) => {
+              const v = (event.target as HTMLInputElement).value as Tool;
+              if (TOOLS.some((t) => t.value === v)) setToolTip(v);
+            }}
+            onBlur={() => setToolTip(null)}
             onChange={(value) => {
               setTool(value as Tool);
-              if (value !== "select") setSelected(null);
+              setToolTip(value as Tool);
+              // Switching tools always clears the selection.
+              setSelected(null);
             }}
           />
+          {/* OWNER-APPROVED EXCEPTION: no visible label ("Pen color" is
+              its accessible name only), so the toolbar sits on one line.
+              The label rules say no label is visually hidden. */}
           <Dropdown
-            label="Pen color"
+            aria-label="Pen color"
             formLayout="stacked"
             data-autofocus
             allowDeselect={false}
@@ -568,11 +640,26 @@ export function AnnotationEditor({
                         key={i}
                         data-ann={isDraft ? undefined : i}
                         className="art-ann-item"
-                        tabIndex={isDraft ? undefined : 0}
-                        role={isDraft ? undefined : "button"}
+                        // Selectable (a tab stop, a toggle button) only with
+                        // the Select tool; in an add tool an annotation is
+                        // just a named image, and clicks on it add another.
+                        tabIndex={isDraft || tool !== "select" ? undefined : 0}
+                        role={
+                          isDraft
+                            ? undefined
+                            : tool === "select"
+                              ? "button"
+                              : "img"
+                        }
                         aria-label={isDraft ? undefined : label}
-                        aria-pressed={isDraft ? undefined : selected === i}
-                        onFocus={() => !isDraft && setSelected(i)}
+                        aria-pressed={
+                          isDraft || tool !== "select"
+                            ? undefined
+                            : selected === i
+                        }
+                        onFocus={() =>
+                          !isDraft && tool === "select" && setSelected(i)
+                        }
                       >
                         <AnnotationShape
                           a={a}
